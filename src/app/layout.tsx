@@ -15,27 +15,26 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Safara Travel - خدمات سياحية متكاملة",
+  title: "H - Tourism Services | خدمات سياحية متكاملة",
   description:
-    "Discover amazing tourism experiences with Safara Travel. Explore the best tours, adventures, and destinations with trusted local providers. اكتشف تجارب سياحية مذهلة مع سفارة ترافل.",
+    "Discover amazing tourism experiences with H. Explore the best tours, adventures, and destinations with trusted local providers. اكتشف تجارب سياحية مذهلة مع منصة H.",
   keywords: [
-    "Safara Travel",
+    "H",
     "tourism",
     "السياحة",
-    "سفارة ترافل",
     "travel services",
     "tours",
     "adventures",
     "destinations",
+    "booking",
   ],
-  authors: [{ name: "Safara Travel" }],
+  authors: [{ name: "H Platform" }],
   icons: {
     icon: "/images/logo.png",
   },
   openGraph: {
-    title: "Safara Travel - خدمات سياحية متكاملة",
-    description:
-      "Discover amazing tourism experiences with trusted local providers.",
+    title: "H - Tourism Services",
+    description: "Discover amazing tourism experiences with trusted local providers.",
     type: "website",
   },
 };
