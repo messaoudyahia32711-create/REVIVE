@@ -317,8 +317,8 @@ export default function Header() {
                   >
                     <Avatar className="h-10 w-10 ring-2 ring-purple-500/40 hover:ring-purple-500/80 transition-all duration-300 shadow-[0_0_16px_rgba(139,92,246,0.25)]">
                       {user.avatar && <AvatarImage src={user.avatar} alt={user.name} />}
-                      <AvatarFallback className="bg-gradient-to-br from-purple-600 to-purple-800 text-white font-bold text-sm">
-                        {user.name?.charAt(0).toUpperCase()}
+                      <AvatarFallback className="bg-gradient-to-br from-purple-600 to-purple-800 p-0.5">
+                        <Image src="/images/logo.png" alt="REVIVE" width={28} height={28} className="rounded object-cover" />
                       </AvatarFallback>
                     </Avatar>
                     <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 rounded-full bg-emerald-500 border-2 border-[#0a0a0f]" />

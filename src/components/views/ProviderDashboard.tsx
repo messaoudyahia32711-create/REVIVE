@@ -375,7 +375,14 @@ export default function ProviderDashboard() {
     setUpdatingBooking(id);
     try {
       const res = await fetch(`/api/bookings/${id}`, { method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status }) });
-      if (res.ok) { showToast(statusLabel(status), 'success'); fetchBookings(); fetchDashboard(); }
+      if (res.ok) {
+        showToast(statusLabel(status), 'success');
+        // Auto-switch to the target status tab so user sees the booking moved
+        setBookingFilter(status);
+        setActiveTab('bookings');
+        fetchBookings();
+        fetchDashboard();
+      }
     } catch { showToast(locale === 'ar' ? 'خطأ' : 'Error', 'error'); }
     setUpdatingBooking(null);
   };
