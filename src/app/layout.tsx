@@ -1,12 +1,15 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Cairo } from "next/font/google";
+import { Geist_Mono } from "next/font/google";
 import { ThemeProvider } from "next-themes";
 import "./globals.css";
 import { Toaster } from "@/components/ui/toaster";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
-  subsets: ["latin"],
+const cairo = Cairo({
+  variable: "--font-cairo",
+  subsets: ["latin", "arabic"],
+  weight: ["300", "400", "500", "600", "700", "800", "900"],
+  display: "swap",
 });
 
 const geistMono = Geist_Mono({
@@ -15,25 +18,14 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "H - Tourism Services | خدمات سياحية متكاملة",
+  title: "H - Tourism Platform | منصة H السياحية",
   description:
     "Discover amazing tourism experiences with H. Explore the best tours, adventures, and destinations with trusted local providers. اكتشف تجارب سياحية مذهلة مع منصة H.",
-  keywords: [
-    "H",
-    "tourism",
-    "السياحة",
-    "travel services",
-    "tours",
-    "adventures",
-    "destinations",
-    "booking",
-  ],
+  keywords: ["H", "tourism", "السياحة", "travel", "booking", "tours", "adventures"],
   authors: [{ name: "H Platform" }],
-  icons: {
-    icon: "/images/logo.png",
-  },
+  icons: { icon: "/images/logo.png" },
   openGraph: {
-    title: "H - Tourism Services",
+    title: "H - Tourism Platform",
     description: "Discover amazing tourism experiences with trusted local providers.",
     type: "website",
   },
@@ -45,16 +37,12 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="ar" dir="rtl" suppressHydrationWarning>
+    <html lang="ar" dir="rtl" suppressHydrationWarning className="dark">
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased bg-background text-foreground min-h-screen flex flex-col`}
+        className={`${cairo.variable} ${geistMono.variable} antialiased bg-background text-foreground min-h-screen flex flex-col`}
+        style={{ fontFamily: 'var(--font-cairo), sans-serif' }}
       >
-        <ThemeProvider
-          attribute="class"
-          defaultTheme="light"
-          enableSystem
-          disableTransitionOnChange
-        >
+        <ThemeProvider attribute="class" defaultTheme="dark" enableSystem disableTransitionOnChange>
           {children}
           <Toaster />
         </ThemeProvider>

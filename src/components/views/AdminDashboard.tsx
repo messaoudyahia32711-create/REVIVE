@@ -1,0 +1,871 @@
+'use client';
+
+import { useState, useEffect, useRef, useCallback } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import {
+  LayoutDashboard, Users, Building2, Package, CalendarCheck, Settings,
+  DollarSign, Star, Shield, TrendingUp, Menu, ChevronLeft, ChevronRight,
+  Search, XCircle, CheckCircle2, Eye, Ban, Award, MessageSquare,
+  StarOff, Globe, BarChart3,
+} from 'lucide-react';
+import {
+  BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
+} from 'recharts';
+import { Card, CardHeader, CardTitle } from '@/components/ui/card';
+import { Button } from '@/components/ui/button';
+import { Badge } from '@/components/ui/badge';
+import { Input } from '@/components/ui/input';
+import { Separator } from '@/components/ui/separator';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { Skeleton } from '@/components/ui/skeleton';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import {
+  Sheet, SheetContent, SheetTrigger, SheetTitle,
+} from '@/components/ui/sheet';
+import {
+  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
+} from '@/components/ui/select';
+import { useAppStore } from '@/lib/store';
+import { cn } from '@/lib/utils';
+
+// ── Types ──────────────────────────────────────────────────────────────────
+
+type TabId = 'overview' | 'users' | 'providers' | 'services' | 'bookings' | 'settings';
+
+interface AdminData {
+  totalUsers: number; totalProviders: number; totalServices: number;
+  totalBookings: number; totalReviews: number; totalCategories: number;
+  pendingBookings: number; completedBookings: number; cancelledBookings: number;
+  totalRevenue: number;
+  monthlyData: { month: string; bookings: number; revenue: number }[];
+  recentBookings: AdminBooking[];
+  recentProviders: AdminProvider[];
+  recentUsers: AdminUser[];
+  recentServices: AdminService[];
+}
+
+interface AdminBooking {
+  id: string; userId: string; serviceId: string; providerId: string;
+  status: string; bookingDate: string; numberOfPeople: number;
+  totalPrice: number; notes: string | null; createdAt: string;
+  service: { id: string; titleAr: string; titleEn: string; image: string | null };
+  user: { id: string; name: string; email: string };
+}
+
+interface AdminUser {
+  id: string; name: string; email: string; role: string; createdAt: string;
+}
+
+interface AdminProvider {
+  id: string; userId: string; companyName: string; description: string | null;
+  location: string | null; rating: number; totalReviews: number; verified: boolean;
+  createdAt: string;
+  user: { name: string; email: string };
+  _count: { services: number; bookings: number };
+}
+
+interface AdminService {
+  id: string; providerId: string; categoryId: string;
+  titleAr: string; titleEn: string; price: number; duration: string;
+  location: string; image: string | null; active: boolean; featured: boolean;
+  rating: number; totalReviews: number; createdAt: string;
+  provider: { companyName: string } | null;
+  category: { nameAr: string; nameEn: string } | null;
+}
+
+// ── Animation ──────────────────────────────────────────────────────────────
+
+const stagger = {
+  hidden: { opacity: 0 }, visible: { opacity: 1, transition: { staggerChildren: 0.06, delayChildren: 0.05 } },
+};
+const staggerItem = {
+  hidden: { opacity: 0, y: 20, scale: 0.98 },
+  visible: { opacity: 1, y: 0, scale: 1, transition: { duration: 0.4, ease: [0.23, 1, 0.32, 1] } },
+};
+
+// ── Animated Counter ───────────────────────────────────────────────────────
+
+function AnimatedCounter({ target, duration = 1200 }: { target: number; duration?: number }) {
+  const [count, setCount] = useState(0);
+  const did = useRef(false);
+  useEffect(() => {
+    if (did.current) return; did.current = true;
+    const s = performance.now();
+    const tick = (n: number) => {
+      const p = Math.min((n - s) / duration, 1);
+      setCount(Math.floor((1 - Math.pow(1 - p, 3)) * target));
+      if (p < 1) requestAnimationFrame(tick);
+    };
+    requestAnimationFrame(tick);
+  }, [target, duration]);
+  return <>{count.toLocaleString()}</>;
+}
+
+// ── Status Badge ───────────────────────────────────────────────────────────
+
+function StatusBadge({ status, label }: { status: string; label: string }) {
+  const cfg: Record<string, string> = {
+    pending:   'bg-yellow-500/10 border-yellow-500/30 text-yellow-400',
+    confirmed: 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400',
+    completed: 'bg-purple-500/10 border-purple-500/30 text-purple-400',
+    cancelled: 'bg-red-500/10 border-red-500/30 text-red-400',
+  };
+  return <span className={cn('px-2.5 py-0.5 rounded-lg border text-[10px] font-bold uppercase tracking-wider', cfg[status] || cfg.pending)}>{label}</span>;
+}
+
+// ── Main Component ─────────────────────────────────────────────────────────
+
+export default function AdminDashboard() {
+  const { t, locale, isRTL, showToast } = useAppStore();
+
+  const [activeTab, setActiveTab] = useState<TabId>('overview');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [data, setData] = useState<AdminData | null>(null);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [bookingStatusFilter, setBookingStatusFilter] = useState('all');
+
+  const fetchAdmin = useCallback(async () => {
+    setLoading(true);
+    try {
+      const res = await fetch('/api/admin');
+      if (res.ok) setData(await res.json());
+    } catch { /* silent */ }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => {
+    const load = async () => { setLoading(true); try { const res = await fetch('/api/admin'); if (res.ok) setData(await res.json()); } catch { /* silent */ } setLoading(false); };
+    load();
+  }, []);
+
+  // ── Booking Status Update ────────────────────────────────────────────────
+
+  const updateBookingStatus = async (id: string, status: string) => {
+    try {
+      const res = await fetch(`/api/bookings/${id}`, {
+        method: 'PATCH', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ status }),
+      });
+      if (res.ok) { showToast(locale === 'ar' ? 'تم التحديث' : 'Updated', 'success'); fetchAdmin(); }
+    } catch { showToast(locale === 'ar' ? 'خطأ' : 'Error', 'error'); }
+  };
+
+  // ── Helpers ──────────────────────────────────────────────────────────────
+
+  const gt = (ar: string, en: string) => locale === 'ar' ? ar : en;
+  const statusLabel = (s: string) => {
+    const m: Record<string, string> = {
+      pending: t('bookingPending'), confirmed: t('bookingConfirmed'),
+      completed: t('bookingCompleted'), cancelled: t('bookingCancelled'),
+    };
+    return m[s] || s;
+  };
+
+  // ── Nav Items ────────────────────────────────────────────────────────────
+
+  const navItems: { id: TabId; icon: React.ElementType; label: string }[] = [
+    { id: 'overview',  icon: LayoutDashboard, label: locale === 'ar' ? 'نظرة عامة' : 'Overview' },
+    { id: 'users',     icon: Users,           label: locale === 'ar' ? 'المستخدمون' : 'Users' },
+    { id: 'providers', icon: Building2,       label: locale === 'ar' ? 'المزودون' : 'Providers' },
+    { id: 'services',  icon: Package,         label: locale === 'ar' ? 'الخدمات' : 'Services' },
+    { id: 'bookings',  icon: CalendarCheck,   label: locale === 'ar' ? 'الحجوزات' : 'Bookings' },
+    { id: 'settings',  icon: Settings,        label: locale === 'ar' ? 'الإعدادات' : 'Settings' },
+  ];
+
+  // ── Sidebar Content ──────────────────────────────────────────────────────
+
+  const renderSidebarContent = () => (
+    <div className="flex flex-col h-full">
+      {/* H Logo + Admin */}
+      <div className="p-6 pb-4 flex flex-col items-center">
+        <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
+          transition={{ type: 'spring', stiffness: 200, damping: 15 }} className="relative">
+          <div className="text-5xl font-black text-gradient-purple select-none drop-shadow-lg">H</div>
+          <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-gradient-to-r from-transparent via-gold to-transparent" />
+        </motion.div>
+        <p className="text-[11px] font-bold tracking-[0.3em] text-gradient-gold uppercase mt-1.5 flex items-center gap-1">
+          <Shield className="w-3 h-3" /> Admin
+        </p>
+      </div>
+
+      <Separator className="bg-purple-500/10" />
+
+      {/* Navigation */}
+      <nav className="flex-1 px-3 space-y-1 mt-2">
+        {navItems.map((item, idx) => {
+          const Icon = item.icon;
+          const isActive = activeTab === item.id;
+          return (
+            <motion.button
+              key={item.id}
+              initial={{ opacity: 0, x: isRTL ? 20 : -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.1 + idx * 0.04 }}
+              onClick={() => { setActiveTab(item.id); setSidebarOpen(false); }}
+              className={cn(
+                'w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-300 relative overflow-hidden',
+                isActive
+                  ? 'bg-purple-600/20 text-purple-300 shadow-lg shadow-purple-500/5'
+                  : 'text-white/60 hover:text-white hover:bg-white/8'
+              )}
+            >
+              {isActive && (
+                <motion.div
+                  layoutId="admin-sidebar-active"
+                  className={cn('absolute top-2 bottom-2 w-[3px] rounded-full bg-gradient-to-b from-purple-400 via-purple-600 to-purple-800', isRTL ? 'right-0' : 'left-0')}
+                  transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+                />
+              )}
+              <Icon className={cn('h-5 w-5 flex-shrink-0', isActive && 'text-purple-300')} />
+              <span>{item.label}</span>
+            </motion.button>
+          );
+        })}
+      </nav>
+
+      <div className="p-3 border-t border-purple-500/10">
+        <button
+          onClick={() => useAppStore.getState().navigateTo('home')}
+          className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-white/60 hover:text-white hover:bg-white/8 transition-all"
+        >
+          {isRTL ? <ChevronRight className="h-5 w-5" /> : <ChevronLeft className="h-5 w-5" />}
+          <span>{t('back')}</span>
+        </button>
+      </div>
+    </div>
+  );
+
+  // ── Skeleton ─────────────────────────────────────────────────────────────
+
+  const LoadingSkeleton = () => (
+    <div className="space-y-6 animate-pulse">
+      <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+        {[...Array(8)].map((_, i) => <Skeleton key={i} className="h-32 rounded-2xl bg-purple-500/5" />)}
+      </div>
+      <Skeleton className="h-80 rounded-2xl bg-purple-500/5" />
+      <Skeleton className="h-64 rounded-2xl bg-purple-500/5" />
+    </div>
+  );
+
+  const EmptyState = ({ icon: Icon, title, desc }: { icon: React.ElementType; title: string; desc: string }) => (
+    <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
+      className="flex flex-col items-center justify-center py-20 text-center">
+      <div className="w-20 h-20 rounded-2xl glass flex items-center justify-center mb-5">
+        <Icon className="h-10 w-10 text-muted-foreground/30" />
+      </div>
+      <h3 className="font-semibold text-lg mb-2 text-white">{title}</h3>
+      <p className="text-sm text-muted-foreground max-w-xs">{desc}</p>
+    </motion.div>
+  );
+
+  // ── Overview Tab ─────────────────────────────────────────────────────────
+
+  const renderOverviewTab = () => {
+    if (loading || !data) return <LoadingSkeleton />;
+
+    const overviewStats = [
+      { label: locale === 'ar' ? 'المستخدمون' : 'Users', value: data.totalUsers, icon: Users, gradient: 'bg-gradient-to-br from-purple-600 to-purple-800', isGold: false },
+      { label: locale === 'ar' ? 'المزودون' : 'Providers', value: data.totalProviders, icon: Building2, gradient: 'bg-gradient-to-br from-indigo-600 to-purple-700', isGold: false },
+      { label: locale === 'ar' ? 'الخدمات' : 'Services', value: data.totalServices, icon: Package, gradient: 'bg-gradient-to-br from-emerald-600 to-emerald-800', isGold: false },
+      { label: locale === 'ar' ? 'الحجوزات' : 'Bookings', value: data.totalBookings, icon: CalendarCheck, gradient: 'bg-gradient-to-br from-teal-500 to-teal-700', isGold: false },
+      { label: locale === 'ar' ? 'الإيرادات' : 'Revenue', value: data.totalRevenue, icon: DollarSign, gradient: 'bg-gradient-to-br from-gold-dark to-gold', isGold: true, suffix: t('sar') },
+      { label: locale === 'ar' ? 'التقييمات' : 'Reviews', value: data.totalReviews, icon: Star, gradient: 'bg-gradient-to-br from-gold-dark to-gold-light', isGold: true },
+      { label: locale === 'ar' ? 'التصنيفات' : 'Categories', value: data.totalCategories, icon: Globe, gradient: 'bg-gradient-to-br from-pink-600 to-purple-700', isGold: false },
+      { label: locale === 'ar' ? 'قيد الانتظار' : 'Pending', value: data.pendingBookings, icon: TrendingUp, gradient: 'bg-gradient-to-br from-yellow-600 to-orange-700', isGold: false },
+    ];
+
+    return (
+      <motion.div variants={stagger} initial="hidden" animate="visible" className="space-y-8">
+        {/* Header */}
+        <motion.div variants={staggerItem}>
+          <div className="flex items-center gap-3 mb-1">
+            <Shield className="h-8 w-8 text-purple-400" />
+            <div className="text-3xl font-black text-gradient-purple">{locale === 'ar' ? 'لوحة الإدارة' : 'Admin Dashboard'}</div>
+          </div>
+          <p className="text-muted-foreground text-sm">{locale === 'ar' ? 'إدارة المنصة والمراقبة' : 'Platform management & monitoring'}</p>
+        </motion.div>
+
+        {/* 8 Stat Cards in 4x2 */}
+        <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+          {overviewStats.map((stat) => {
+            const Icon = stat.icon;
+            return (
+              <motion.div key={stat.label} variants={staggerItem} whileHover={{ y: -4, scale: 1.02 }}
+                transition={{ type: 'spring', stiffness: 300, damping: 20 }}>
+                <div className="glass corner-ornament rounded-2xl overflow-hidden p-5 border border-purple-500/10 glow-purple card-hover">
+                  <div className="flex items-center justify-between">
+                    <div className="space-y-2">
+                      <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest">{stat.label}</p>
+                      <p className={cn('text-2xl font-extrabold tracking-tight', stat.isGold && 'text-gradient-gold')}>
+                        <AnimatedCounter target={stat.value as number} />
+                        {stat.suffix && <span className="text-sm font-semibold ms-1 text-gold-dark">{stat.suffix}</span>}
+                      </p>
+                    </div>
+                    <div className={cn('w-11 h-11 rounded-xl flex items-center justify-center pulse-glow-purple', stat.gradient)}>
+                      <Icon className="w-5 h-5 text-white" />
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            );
+          })}
+        </div>
+
+        {/* Revenue Chart */}
+        <motion.div variants={staggerItem}>
+          <div className="glass rounded-2xl p-6 border border-purple-500/10">
+            <CardHeader className="p-0 pb-4">
+              <CardTitle className="text-lg font-bold flex items-center gap-2 text-white">
+                <BarChart3 className="h-5 w-5 text-purple-400" />
+                {locale === 'ar' ? 'الإيرادات الشهرية' : 'Monthly Revenue'}
+              </CardTitle>
+            </CardHeader>
+            <div className="h-72">
+              <ResponsiveContainer width="100%" height="100%">
+                <BarChart data={data.monthlyData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                  <defs>
+                    <linearGradient id="adminPurpleGrad" x1="0" y1="0" x2="0" y2="1">
+                      <stop offset="0%" stopColor="#8B5CF6" stopOpacity={1} />
+                      <stop offset="50%" stopColor="#6D28D9" stopOpacity={0.9} />
+                      <stop offset="100%" stopColor="#4C1D95" stopOpacity={0.7} />
+                    </linearGradient>
+                  </defs>
+                  <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#888' }} axisLine={false} tickLine={false} />
+                  <YAxis tick={{ fontSize: 11, fill: '#888' }} axisLine={false} tickLine={false} />
+                  <Tooltip
+                    contentStyle={{ borderRadius: '16px', border: '1px solid rgba(139,92,246,0.2)',
+                      boxShadow: '0 8px 32px rgba(0,0,0,0.3)', backdropFilter: 'blur(16px)', background: 'rgba(10,10,15,0.95)', color: '#fff' }}
+                    formatter={(value: number) => [`${value.toLocaleString()} ${t('sar')}`, locale === 'ar' ? 'الإيرادات' : 'Revenue']}
+                    cursor={{ fill: 'rgba(139,92,246,0.06)' }}
+                  />
+                  <Bar dataKey="revenue" fill="url(#adminPurpleGrad)" radius={[8, 8, 0, 0]} maxBarSize={48} />
+                </BarChart>
+              </ResponsiveContainer>
+            </div>
+          </div>
+        </motion.div>
+
+        {/* Tables Row */}
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
+          {/* Recent Bookings Table */}
+          <motion.div variants={staggerItem}>
+            <div className="glass rounded-2xl border border-purple-500/10 overflow-hidden">
+              <div className="px-5 py-4 border-b border-purple-500/10">
+                <h3 className="font-bold text-sm text-white flex items-center gap-2">
+                  <CalendarCheck className="h-4 w-4 text-purple-400" />
+                  {locale === 'ar' ? 'أحدث الحجوزات' : 'Recent Bookings'}
+                </h3>
+              </div>
+              <div className="overflow-x-auto max-h-80">
+                <table className="w-full text-sm">
+                  <thead className="sticky top-0">
+                    <tr className="bg-purple-500/5">
+                      <th className="text-start px-4 py-2.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{locale === 'ar' ? 'المستخدم' : 'User'}</th>
+                      <th className="text-start px-4 py-2.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{locale === 'ar' ? 'الخدمة' : 'Service'}</th>
+                      <th className="text-start px-4 py-2.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{locale === 'ar' ? 'الحالة' : 'Status'}</th>
+                      <th className="text-start px-4 py-2.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{locale === 'ar' ? 'السعر' : 'Price'}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.recentBookings.length === 0 ? (
+                      <tr><td colSpan={4} className="px-4 py-8 text-center text-muted-foreground text-xs">{t('noData')}</td></tr>
+                    ) : data.recentBookings.map(b => (
+                      <tr key={b.id} className="border-t border-purple-500/5 hover:bg-purple-500/5 transition-colors">
+                        <td className="px-4 py-3 text-white/80 text-xs truncate max-w-[100px]">{b.user.name}</td>
+                        <td className="px-4 py-3 text-white/80 text-xs truncate max-w-[120px]">{gt(b.service.titleAr, b.service.titleEn)}</td>
+                        <td className="px-4 py-3"><StatusBadge status={b.status} label={statusLabel(b.status)} /></td>
+                        <td className="px-4 py-3 text-xs font-bold text-gradient-gold">{b.totalPrice.toLocaleString()} {t('sar')}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </motion.div>
+
+          {/* Recent Users Table */}
+          <motion.div variants={staggerItem}>
+            <div className="glass rounded-2xl border border-purple-500/10 overflow-hidden">
+              <div className="px-5 py-4 border-b border-purple-500/10">
+                <h3 className="font-bold text-sm text-white flex items-center gap-2">
+                  <Users className="h-4 w-4 text-purple-400" />
+                  {locale === 'ar' ? 'أحدث المستخدمين' : 'Recent Users'}
+                </h3>
+              </div>
+              <div className="overflow-x-auto max-h-80">
+                <table className="w-full text-sm">
+                  <thead className="sticky top-0">
+                    <tr className="bg-purple-500/5">
+                      <th className="text-start px-4 py-2.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{t('name')}</th>
+                      <th className="text-start px-4 py-2.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{t('email')}</th>
+                      <th className="text-start px-4 py-2.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{locale === 'ar' ? 'الدور' : 'Role'}</th>
+                      <th className="text-start px-4 py-2.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{locale === 'ar' ? 'التاريخ' : 'Date'}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.recentUsers.length === 0 ? (
+                      <tr><td colSpan={4} className="px-4 py-8 text-center text-muted-foreground text-xs">{t('noData')}</td></tr>
+                    ) : data.recentUsers.map(u => (
+                      <tr key={u.id} className="border-t border-purple-500/5 hover:bg-purple-500/5 transition-colors">
+                        <td className="px-4 py-3 text-white/80 text-xs">{u.name}</td>
+                        <td className="px-4 py-3 text-muted-foreground text-xs truncate max-w-[140px]">{u.email}</td>
+                        <td className="px-4 py-3">
+                          <span className={cn('px-2 py-0.5 rounded-md text-[10px] font-bold',
+                            u.role === 'provider' ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20' : 'bg-white/5 text-white/60 border border-white/10')}>
+                            {u.role === 'provider' ? t('providerRole') : t('userRole')}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-muted-foreground text-xs">{new Date(u.createdAt).toLocaleDateString()}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </motion.div>
+
+          {/* Recent Providers Table */}
+          <motion.div variants={staggerItem} className="xl:col-span-2">
+            <div className="glass rounded-2xl border border-purple-500/10 overflow-hidden">
+              <div className="px-5 py-4 border-b border-purple-500/10">
+                <h3 className="font-bold text-sm text-white flex items-center gap-2">
+                  <Building2 className="h-4 w-4 text-purple-400" />
+                  {locale === 'ar' ? 'أحدث المزودين' : 'Recent Providers'}
+                </h3>
+              </div>
+              <div className="overflow-x-auto max-h-80">
+                <table className="w-full text-sm">
+                  <thead className="sticky top-0">
+                    <tr className="bg-purple-500/5">
+                      <th className="text-start px-4 py-2.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{t('name')}</th>
+                      <th className="text-start px-4 py-2.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{locale === 'ar' ? 'الشركة' : 'Company'}</th>
+                      <th className="text-start px-4 py-2.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{locale === 'ar' ? 'التقييم' : 'Rating'}</th>
+                      <th className="text-start px-4 py-2.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{locale === 'ar' ? 'الخدمات' : 'Services'}</th>
+                      <th className="text-start px-4 py-2.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{locale === 'ar' ? 'الحجوزات' : 'Bookings'}</th>
+                      <th className="text-start px-4 py-2.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{locale === 'ar' ? 'الحالة' : 'Status'}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {data.recentProviders.length === 0 ? (
+                      <tr><td colSpan={6} className="px-4 py-8 text-center text-muted-foreground text-xs">{t('noData')}</td></tr>
+                    ) : data.recentProviders.map(p => (
+                      <tr key={p.id} className="border-t border-purple-500/5 hover:bg-purple-500/5 transition-colors">
+                        <td className="px-4 py-3 text-white/80 text-xs">{p.user.name}</td>
+                        <td className="px-4 py-3 text-white/80 text-xs">{p.companyName}</td>
+                        <td className="px-4 py-3">
+                          <div className="flex items-center gap-1 text-gold star-filled">
+                            <Star className="w-3 h-3 fill-current" />
+                            <span className="text-xs font-bold">{p.rating.toFixed(1)}</span>
+                          </div>
+                        </td>
+                        <td className="px-4 py-3 text-xs text-purple-400">{p._count.services}</td>
+                        <td className="px-4 py-3 text-xs text-purple-400">{p._count.bookings}</td>
+                        <td className="px-4 py-3">
+                          {p.verified ? (
+                            <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                              {locale === 'ar' ? 'موثق' : 'Verified'}
+                            </span>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-yellow-500/10 text-yellow-400 border border-yellow-500/20">
+                              {locale === 'ar' ? 'بانتظار التحقق' : 'Unverified'}
+                            </span>
+                          )}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+      </motion.div>
+    );
+  };
+
+  // ── Users Tab ────────────────────────────────────────────────────────────
+
+  const renderUsersTab = () => {
+    if (loading || !data) return <LoadingSkeleton />;
+    const filtered = data.recentUsers.filter(u =>
+      u.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      u.email.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+    return (
+      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+        <div className="flex items-center justify-between gap-4">
+          <h2 className="text-lg font-bold text-white flex items-center gap-2">
+            <Users className="h-5 w-5 text-purple-400" />
+            {locale === 'ar' ? 'المستخدمون' : 'Users'} ({data.totalUsers})
+          </h2>
+          <div className="relative w-64">
+            <Search className="absolute top-1/2 -translate-y-1/2 start-3 w-4 h-4 text-muted-foreground" />
+            <Input value={searchQuery} onChange={e => setSearchQuery(e.target.value)}
+              placeholder={locale === 'ar' ? 'بحث...' : 'Search...'}
+              className="ps-9 bg-purple-500/5 border-purple-500/15 text-white placeholder:text-muted-foreground focus-visible:ring-purple-500/30" />
+          </div>
+        </div>
+
+        {filtered.length === 0 ? (
+          <EmptyState icon={Users} title={locale === 'ar' ? 'لا يوجد مستخدمون' : 'No users'} desc={t('noData')} />
+        ) : (
+          <div className="glass rounded-2xl border border-purple-500/10 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-purple-500/5">
+                    <th className="text-start px-5 py-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{t('name')}</th>
+                    <th className="text-start px-5 py-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{t('email')}</th>
+                    <th className="text-start px-5 py-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{locale === 'ar' ? 'الدور' : 'Role'}</th>
+                    <th className="text-start px-5 py-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{locale === 'ar' ? 'تاريخ الانضمام' : 'Joined'}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map(u => (
+                    <tr key={u.id} className="border-t border-purple-500/5 hover:bg-purple-500/5 transition-colors">
+                      <td className="px-5 py-3">
+                        <div className="flex items-center gap-3">
+                          <Avatar className="h-8 w-8 ring-1 ring-purple-500/20">
+                            <AvatarFallback className="bg-gradient-to-br from-purple-600 to-purple-800 text-white text-xs font-bold">{u.name.charAt(0)}</AvatarFallback>
+                          </Avatar>
+                          <span className="text-white/90 text-sm font-medium">{u.name}</span>
+                        </div>
+                      </td>
+                      <td className="px-5 py-3 text-muted-foreground text-xs">{u.email}</td>
+                      <td className="px-5 py-3">
+                        <span className={cn('px-2.5 py-0.5 rounded-lg text-[10px] font-bold',
+                          u.role === 'provider' ? 'bg-purple-500/10 text-purple-400 border border-purple-500/20' : 'bg-white/5 text-white/60 border border-white/10')}>
+                          {u.role === 'provider' ? t('providerRole') : t('userRole')}
+                        </span>
+                      </td>
+                      <td className="px-5 py-3 text-muted-foreground text-xs">{new Date(u.createdAt).toLocaleDateString()}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </motion.div>
+    );
+  };
+
+  // ── Providers Tab ────────────────────────────────────────────────────────
+
+  const renderProvidersTab = () => {
+    if (loading || !data) return <LoadingSkeleton />;
+    return (
+      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+        <h2 className="text-lg font-bold text-white flex items-center gap-2">
+          <Building2 className="h-5 w-5 text-purple-400" />
+          {locale === 'ar' ? 'المزودون' : 'Providers'} ({data.totalProviders})
+        </h2>
+
+        {data.recentProviders.length === 0 ? (
+          <EmptyState icon={Building2} title={locale === 'ar' ? 'لا يوجد مزودون' : 'No providers'} desc={t('noData')} />
+        ) : (
+          <div className="glass rounded-2xl border border-purple-500/10 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-purple-500/5">
+                    <th className="text-start px-5 py-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{locale === 'ar' ? 'الشركة' : 'Company'}</th>
+                    <th className="text-start px-5 py-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{locale === 'ar' ? 'البريد' : 'Email'}</th>
+                    <th className="text-start px-5 py-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{t('location')}</th>
+                    <th className="text-start px-5 py-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{locale === 'ar' ? 'التقييم' : 'Rating'}</th>
+                    <th className="text-start px-5 py-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{locale === 'ar' ? 'الخدمات' : 'Services'}</th>
+                    <th className="text-start px-5 py-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{locale === 'ar' ? 'الحالة' : 'Status'}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.recentProviders.map(p => (
+                    <tr key={p.id} className="border-t border-purple-500/5 hover:bg-purple-500/5 transition-colors">
+                      <td className="px-5 py-3">
+                        <div className="flex items-center gap-3">
+                          <Avatar className="h-8 w-8 ring-1 ring-purple-500/20">
+                            <AvatarFallback className="bg-gradient-to-br from-purple-600 to-purple-800 text-white text-xs font-bold">{p.companyName.charAt(0)}</AvatarFallback>
+                          </Avatar>
+                          <div>
+                            <p className="text-white/90 text-sm font-medium">{p.companyName}</p>
+                            <p className="text-[10px] text-muted-foreground">{p.user.name}</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-5 py-3 text-muted-foreground text-xs">{p.user.email}</td>
+                      <td className="px-5 py-3 text-muted-foreground text-xs">{p.location || '—'}</td>
+                      <td className="px-5 py-3">
+                        <div className="flex items-center gap-1 text-gold star-filled">
+                          <Star className="w-3 h-3 fill-current" />
+                          <span className="text-xs font-bold">{p.rating.toFixed(1)}</span>
+                          <span className="text-[10px] text-muted-foreground">({p.totalReviews})</span>
+                        </div>
+                      </td>
+                      <td className="px-5 py-3 text-xs text-purple-400">{p._count.services}</td>
+                      <td className="px-5 py-3">
+                        {p.verified ? (
+                          <span className="px-2.5 py-0.5 rounded-lg text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 flex items-center gap-1 w-fit">
+                            <CheckCircle2 className="w-3 h-3" /> {locale === 'ar' ? 'موثق' : 'Verified'}
+                          </span>
+                        ) : (
+                          <span className="px-2.5 py-0.5 rounded-lg text-[10px] font-bold bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 flex items-center gap-1 w-fit">
+                            <Eye className="w-3 h-3" /> {locale === 'ar' ? 'بانتظار' : 'Pending'}
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </motion.div>
+    );
+  };
+
+  // ── Services Tab ─────────────────────────────────────────────────────────
+
+  const renderServicesTab = () => {
+    if (loading || !data) return <LoadingSkeleton />;
+    return (
+      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+        <h2 className="text-lg font-bold text-white flex items-center gap-2">
+          <Package className="h-5 w-5 text-purple-400" />
+          {locale === 'ar' ? 'الخدمات' : 'Services'} ({data.totalServices})
+        </h2>
+
+        {data.recentServices.length === 0 ? (
+          <EmptyState icon={Package} title={locale === 'ar' ? 'لا توجد خدمات' : 'No services'} desc={t('noData')} />
+        ) : (
+          <div className="glass rounded-2xl border border-purple-500/10 overflow-hidden">
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm">
+                <thead>
+                  <tr className="bg-purple-500/5">
+                    <th className="text-start px-5 py-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{locale === 'ar' ? 'الخدمة' : 'Service'}</th>
+                    <th className="text-start px-5 py-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{locale === 'ar' ? 'المزود' : 'Provider'}</th>
+                    <th className="text-start px-5 py-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{locale === 'ar' ? 'التصنيف' : 'Category'}</th>
+                    <th className="text-start px-5 py-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{locale === 'ar' ? 'السعر' : 'Price'}</th>
+                    <th className="text-start px-5 py-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{locale === 'ar' ? 'الحالة' : 'Status'}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.recentServices.map(s => (
+                    <tr key={s.id} className="border-t border-purple-500/5 hover:bg-purple-500/5 transition-colors">
+                      <td className="px-5 py-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-lg overflow-hidden flex-shrink-0 bg-purple-500/10">
+                            {s.image ? <img src={s.image} alt="" className="w-full h-full object-cover" /> : (
+                              <div className="w-full h-full bg-gradient-to-br from-purple-500/10 to-purple-900/10 flex items-center justify-center">
+                                <Package className="w-4 h-4 text-purple-500/30" />
+                              </div>
+                            )}
+                          </div>
+                          <div className="min-w-0">
+                            <p className="text-white/90 text-xs font-medium truncate max-w-[150px]">{gt(s.titleAr, s.titleEn)}</p>
+                            {s.featured && (
+                              <span className="text-[9px] text-gold font-bold flex items-center gap-0.5">
+                                <Award className="w-2.5 h-2.5" /> {t('featured')}
+                              </span>
+                            )}
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-5 py-3 text-muted-foreground text-xs">{s.provider?.companyName || '—'}</td>
+                      <td className="px-5 py-3 text-muted-foreground text-xs">{s.category ? gt(s.category.nameAr, s.category.nameEn) : '—'}</td>
+                      <td className="px-5 py-3 text-xs font-bold text-gradient-gold">{s.price.toLocaleString()} {t('sar')}</td>
+                      <td className="px-5 py-3">
+                        {s.active ? (
+                          <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
+                            {locale === 'ar' ? 'نشط' : 'Active'}
+                          </span>
+                        ) : (
+                          <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-red-500/10 text-red-400 border border-red-500/20">
+                            {locale === 'ar' ? 'غير نشط' : 'Inactive'}
+                          </span>
+                        )}
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+      </motion.div>
+    );
+  };
+
+  // ── Bookings Tab ─────────────────────────────────────────────────────────
+
+  const renderBookingsTab = () => {
+    if (loading || !data) return <LoadingSkeleton />;
+    const filtered = bookingStatusFilter === 'all'
+      ? data.recentBookings
+      : data.recentBookings.filter(b => b.status === bookingStatusFilter);
+
+    return (
+      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <h2 className="text-lg font-bold text-white flex items-center gap-2">
+            <CalendarCheck className="h-5 w-5 text-purple-400" />
+            {locale === 'ar' ? 'جميع الحجوزات' : 'All Bookings'} ({data.totalBookings})
+          </h2>
+          <div className="flex gap-2 flex-wrap">
+            {['all', 'pending', 'confirmed', 'completed', 'cancelled'].map(f => (
+              <motion.button key={f} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
+                onClick={() => setBookingStatusFilter(f)}
+                className={cn('px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all border',
+                  bookingStatusFilter === f
+                    ? 'btn-purple-gradient text-white border-purple-500/30 shadow-lg shadow-purple-500/20'
+                    : 'glass text-muted-foreground border-purple-500/10 hover:text-purple-300 hover:border-purple-500/20'
+                )}>
+                {f === 'all' ? t('all') : statusLabel(f)}
+              </motion.button>
+            ))}
+          </div>
+        </div>
+
+        {filtered.length === 0 ? (
+          <EmptyState icon={CalendarCheck} title={locale === 'ar' ? 'لا توجد حجوزات' : 'No bookings'} desc={t('noData')} />
+        ) : (
+          <div className="space-y-4">
+            {filtered.map((b, idx) => (
+              <motion.div key={b.id} initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: idx * 0.04 }}
+                className="card-ornament glass rounded-2xl p-5 border border-purple-500/10 card-hover">
+                <div className="flex flex-col sm:flex-row gap-4">
+                  <div className="w-full sm:w-28 h-20 rounded-xl overflow-hidden flex-shrink-0">
+                    {b.service.image ? <img src={b.service.image} alt="" className="w-full h-full object-cover" /> : (
+                      <div className="w-full h-full bg-gradient-to-br from-purple-500/15 to-purple-900/15" />
+                    )}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-start justify-between gap-2 mb-1">
+                      <h3 className="font-bold text-sm text-white truncate">{gt(b.service.titleAr, b.service.titleEn)}</h3>
+                      <StatusBadge status={b.status} label={statusLabel(b.status)} />
+                    </div>
+                    <p className="text-xs text-muted-foreground mb-2">{b.user.name} — {b.user.email}</p>
+                    <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground mb-3">
+                      <span className="flex items-center gap-1"><CalendarCheck className="w-3 h-3 text-purple-400" /> {new Date(b.bookingDate).toLocaleDateString()}</span>
+                      <span className="flex items-center gap-1"><Users className="w-3 h-3 text-purple-400" /> {b.numberOfPeople}</span>
+                    </div>
+                    <div className="flex items-center justify-between pt-3 border-t border-purple-500/10">
+                      <p className="text-lg font-black text-gradient-gold">{b.totalPrice.toLocaleString()} <span className="text-xs text-gold/60">{t('sar')}</span></p>
+                      <div className="flex gap-2">
+                        {b.status === 'pending' && (
+                          <>
+                            <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
+                              onClick={() => updateBookingStatus(b.id, 'confirmed')}
+                              className="px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/30 text-xs text-emerald-400 hover:bg-emerald-500/20 transition-all flex items-center gap-1">
+                              <CheckCircle2 className="w-3 h-3" /> {t('bookingConfirmed')}
+                            </motion.button>
+                            <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
+                              onClick={() => updateBookingStatus(b.id, 'cancelled')}
+                              className="px-3 py-1.5 rounded-lg border border-red-500/15 bg-red-500/5 text-xs text-red-400 hover:bg-red-500/10 transition-all flex items-center gap-1">
+                              <XCircle className="w-3 h-3" /> {t('bookingCancelled')}
+                            </motion.button>
+                          </>
+                        )}
+                        {b.status === 'confirmed' && (
+                          <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
+                            onClick={() => updateBookingStatus(b.id, 'completed')}
+                            className="btn-purple-gradient px-3 py-1.5 rounded-lg text-xs text-white flex items-center gap-1">
+                            <CheckCircle2 className="w-3 h-3" /> {t('bookingCompleted')}
+                          </motion.button>
+                        )}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        )}
+      </motion.div>
+    );
+  };
+
+  // ── Settings Tab ─────────────────────────────────────────────────────────
+
+  const renderSettingsTab = () => (
+    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
+      className="glass rounded-2xl p-6 border border-purple-500/10 space-y-6">
+      <h2 className="text-lg font-bold text-white flex items-center gap-2">
+        <Settings className="h-5 w-5 text-purple-400" />
+        {locale === 'ar' ? 'الإعدادات' : 'Settings'}
+      </h2>
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+        <div className="px-4 py-3 rounded-xl bg-purple-500/5 border border-purple-500/10">
+          <p className="text-xs text-muted-foreground">{locale === 'ar' ? 'إجمالي المستخدمين' : 'Total Users'}</p>
+          <p className="text-lg font-bold text-gradient-purple mt-0.5">{data?.totalUsers || 0}</p>
+        </div>
+        <div className="px-4 py-3 rounded-xl bg-purple-500/5 border border-purple-500/10">
+          <p className="text-xs text-muted-foreground">{locale === 'ar' ? 'إجمالي الإيرادات' : 'Total Revenue'}</p>
+          <p className="text-lg font-bold text-gradient-gold mt-0.5">{(data?.totalRevenue || 0).toLocaleString()} {t('sar')}</p>
+        </div>
+      </div>
+      <div className="p-5 rounded-xl bg-purple-500/5 border border-purple-500/10">
+        <div className="flex items-center gap-3 mb-3">
+          <Shield className="h-5 w-5 text-purple-400" />
+          <p className="text-sm font-semibold text-white">{locale === 'ar' ? 'صلاحيات المسؤول' : 'Admin Permissions'}</p>
+        </div>
+        <div className="space-y-2 text-xs text-muted-foreground">
+          <p className="flex items-center gap-2"><CheckCircle2 className="w-3 h-3 text-emerald-400" /> {locale === 'ar' ? 'عرض جميع البيانات' : 'View all data'}</p>
+          <p className="flex items-center gap-2"><CheckCircle2 className="w-3 h-3 text-emerald-400" /> {locale === 'ar' ? 'إدارة الحجوزات' : 'Manage bookings'}</p>
+          <p className="flex items-center gap-2"><CheckCircle2 className="w-3 h-3 text-emerald-400" /> {locale === 'ar' ? 'التحقق من المزودين' : 'Verify providers'}</p>
+          <p className="flex items-center gap-2"><CheckCircle2 className="w-3 h-3 text-emerald-400" /> {locale === 'ar' ? 'إدارة المستخدمين' : 'Manage users'}</p>
+        </div>
+      </div>
+    </motion.div>
+  );
+
+  // ── Render ────────────────────────────────────────────────────────────────
+
+  return (
+    <div className="min-h-screen bg-mesh-gradient">
+      {/* Mobile Top Bar */}
+      <div className="lg:hidden fixed top-0 inset-x-0 z-40 glass--scrolled border-b border-purple-500/10 px-4 py-3 flex items-center justify-between">
+        <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
+          <SheetTrigger asChild>
+            <Button variant="ghost" size="icon" className="text-purple-400 hover:bg-purple-500/10">
+              <Menu className="h-5 w-5" />
+            </Button>
+          </SheetTrigger>
+          <SheetContent side={isRTL ? 'right' : 'left'} className="w-72 p-0 glass border-purple-500/10 bg-gradient-to-b from-gray-900 to-purple-950/30">
+            <SheetTitle className="sr-only">Admin Menu</SheetTitle>
+            {renderSidebarContent()}
+          </SheetContent>
+        </Sheet>
+        <div className="flex items-center gap-2">
+          <div className="text-2xl font-black text-gradient-purple">H</div>
+          <Shield className="w-4 h-4 text-gold" />
+        </div>
+        <Avatar className="h-8 w-8 ring-2 ring-purple-500/50">
+          <AvatarFallback className="bg-gradient-to-br from-purple-600 to-purple-800 text-white text-xs font-bold">A</AvatarFallback>
+        </Avatar>
+      </div>
+
+      <div className="flex">
+        {/* Desktop Sidebar */}
+        <aside className="hidden lg:block fixed top-0 left-0 bottom-0 w-72 z-30 glass border-e border-purple-500/10 bg-gradient-to-b from-gray-900 to-purple-950/30">
+            {renderSidebarContent()}
+        </aside>
+
+        {/* Main */}
+        <main className="flex-1 lg:ms-72 pt-20 lg:pt-0 min-h-screen">
+          <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
+            <AnimatePresence mode="wait">
+              {activeTab === 'overview' && <motion.div key="overview" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>{renderOverviewTab()}</motion.div>}
+              {activeTab === 'users' && <motion.div key="users" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>{renderUsersTab()}</motion.div>}
+              {activeTab === 'providers' && <motion.div key="providers" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>{renderProvidersTab()}</motion.div>}
+              {activeTab === 'services' && <motion.div key="services" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>{renderServicesTab()}</motion.div>}
+              {activeTab === 'bookings' && <motion.div key="bookings" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>{renderBookingsTab()}</motion.div>}
+              {activeTab === 'settings' && <motion.div key="settings" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>{renderSettingsTab()}</motion.div>}
+            </AnimatePresence>
+          </div>
+        </main>
+      </div>
+    </div>
+  );
+}

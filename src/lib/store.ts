@@ -9,6 +9,7 @@ export type Page =
   | 'booking'
   | 'user-dashboard'
   | 'provider-dashboard'
+  | 'admin-dashboard'
   | 'login'
   | 'register'
   | 'profile';

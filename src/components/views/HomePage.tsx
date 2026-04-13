@@ -1,36 +1,17 @@
 'use client';
 
-import { useEffect, useState, useRef, useCallback } from 'react';
-import { motion, AnimatePresence, useInView } from 'framer-motion';
+import { useState, useEffect, useCallback } from 'react';
+import { motion, useInView } from 'framer-motion';
+import { useRef, type FormEvent } from 'react';
 import {
-  Search,
-  Compass,
-  Building2,
-  Umbrella,
-  Fish,
-  Mountain,
-  Ship,
-  Star,
-  Users,
-  MapPin,
-  Clock,
-  ArrowRight,
-  ArrowLeft,
-  Quote,
-  ChevronDown,
-  Sparkles,
-  Trophy,
-  Award,
-  TrendingUp,
+  Search, Star, MapPin, Clock, ArrowRight, ChevronDown,
+  Shield, Diamond, Lock,
+  Quote, Users, Compass, Award,
 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Card, CardContent } from '@/components/ui/card';
-import { Badge } from '@/components/ui/badge';
 import { useAppStore } from '@/lib/store';
+import { useCountUp } from '@/hooks/use-count-up';
 
-// ── Types ─────────────────────────────────────────────────────────────────────
-
+// ─── Types ────────────────────────────────────────────────
 interface Category {
   id: string;
   nameAr: string;
@@ -44,843 +25,805 @@ interface Service {
   id: string;
   titleAr: string;
   titleEn: string;
-  descriptionAr: string;
-  descriptionEn: string;
   price: number;
-  currency: string;
+  currency?: string;
   duration: string;
   maxPeople: number;
   location: string;
-  image: string;
+  image: string | null;
   rating: number;
   totalReviews: number;
-  provider: { companyName: string; rating: number; verified: boolean };
-  category: { nameAr: string; nameEn: string; icon: string };
+  featured: boolean;
+  provider: {
+    companyName: string;
+    rating: number;
+    verified: boolean;
+  };
+  category: {
+    nameAr: string;
+    nameEn: string;
+    icon: string;
+  };
 }
 
-// ── Icon Map ──────────────────────────────────────────────────────────────────
-
+// ─── Icon Map ─────────────────────────────────────────────
 const iconMap: Record<string, React.ReactNode> = {
-  compass: <Compass className="size-8" />,
-  building: <Building2 className="size-8" />,
-  umbrella: <Umbrella className="size-8" />,
-  fish: <Fish className="size-8" />,
-  mountain: <Mountain className="size-8" />,
-  ship: <Ship className="size-8" />,
+  mountain: <Compass className="w-7 h-7" />,
+  city: <Award className="w-7 h-7" />,
+  beach: <Diamond className="w-7 h-7" />,
+  desert: <Star className="w-7 h-7" />,
+  cruise: <Shield className="w-7 h-7" />,
+  diving: <Diamond className="w-7 h-7" />,
 };
 
-// ── Testimonials Static Data ──────────────────────────────────────────────────
-
-const testimonials = [
-  {
-    id: '1',
-    quoteAr:
-      'تجربة سياحية لا تُنسى! تنظيم الرحلة كان ممتازاً من البداية للنهاية. المرشد السياحي كان محترفاً وودوداً جداً.',
-    quoteEn:
-      'An unforgettable tourism experience! The trip organization was excellent from start to finish. The guide was very professional and friendly.',
-    authorAr: 'خالد المحمدي',
-    authorEn: 'Khalid Al-Mohammadi',
-    roleAr: 'مستكشف',
-    roleEn: 'Explorer',
-    avatar: '/images/guide1.png',
-    rating: 5,
-  },
-  {
-    id: '2',
-    quoteAr:
-      'أفضل رحلة غطس خضتها في حياتي! الشعاب المرجانية مذهلة والفريق متعاون للغاية. أنصح الجميع بتجربتها.',
-    quoteEn:
-      'Best diving trip of my life! The coral reefs are amazing and the team is extremely helpful. I recommend it to everyone.',
-    authorAr: 'نورة الشمري',
-    authorEn: 'Noura Al-Shammari',
-    roleAr: 'مغامرة',
-    roleEn: 'Adventurer',
-    avatar: '/images/guide2.png',
-    rating: 5,
-  },
-  {
-    id: '3',
-    quoteAr:
-      'إقامة رائعة في منتجع الشاطئ. الخدمة فائقة الجودة والمناظر ساحرة. سنعود بالتأكيد في العام القادم.',
-    quoteEn:
-      'Wonderful stay at the beach resort. Top-quality service and stunning views. We will definitely come back next year.',
-    authorAr: 'فهد العتيبي',
-    authorEn: 'Fahd Al-Otaibi',
-    roleAr: 'مسافر',
-    roleEn: 'Traveler',
-    avatar: '/images/guide1.png',
-    rating: 4,
-  },
-];
-
-// ── Animation Variants ────────────────────────────────────────────────────────
-
-const fadeUp = {
-  hidden: { opacity: 0, y: 40 },
-  visible: (i: number) => ({
-    opacity: 1,
-    y: 0,
-    transition: { delay: i * 0.12, duration: 0.7, ease: [0.25, 0.46, 0.45, 0.94] },
-  }),
-};
-
-const staggerContainer = {
-  hidden: {},
-  visible: {
-    transition: { staggerChildren: 0.12 },
-  },
-};
-
-const scaleIn = {
-  hidden: { opacity: 0, scale: 0.92 },
-  visible: {
-    opacity: 1,
-    scale: 1,
-    transition: { duration: 0.6, ease: [0.25, 0.46, 0.45, 0.94] },
-  },
-};
-
-const fadeIn = {
-  hidden: { opacity: 0 },
-  visible: { opacity: 1, transition: { duration: 0.8 } },
-};
-
-// ── Counter Hook ──────────────────────────────────────────────────────────────
-
-function useCountUp(end: number, duration: number = 2000) {
-  const [count, setCount] = useState(0);
-  const ref = useRef<HTMLDivElement>(null);
-  const isInView = useInView(ref, { once: true, margin: '-100px' });
-  const hasStarted = useRef(false);
-
-  useEffect(() => {
-    if (isInView && !hasStarted.current) {
-      hasStarted.current = true;
-      const startTime = Date.now();
-      const isDecimal = end % 1 !== 0;
-
-      const tick = () => {
-        const elapsed = Date.now() - startTime;
-        const progress = Math.min(elapsed / duration, 1);
-        const eased = 1 - Math.pow(1 - progress, 3);
-        setCount(isDecimal ? parseFloat((eased * end).toFixed(1)) : Math.floor(eased * end));
-        if (progress < 1) requestAnimationFrame(tick);
-      };
-      requestAnimationFrame(tick);
-    }
-  }, [isInView, end, duration]);
-
-  return { count, ref };
+function getCategoryIcon(icon: string) {
+  return iconMap[icon] || <Compass className="w-7 h-7" />;
 }
 
-// ── Star Rating Component ─────────────────────────────────────────────────────
-
-function StarRating({ rating, size = 'sm' }: { rating: number; size?: 'sm' | 'md' }) {
-  const starSize = size === 'sm' ? 'size-3.5' : 'size-5';
+// ─── Skeleton Card ────────────────────────────────────────
+function ServiceSkeleton() {
   return (
-    <div className="flex items-center gap-0.5">
-      {[1, 2, 3, 4, 5].map((star) => (
-        <Star
-          key={star}
-          className={`${starSize} ${
-            star <= Math.round(rating)
-              ? 'fill-[#F0D78C] text-[#F0D78C]'
-              : 'text-muted-foreground/30'
-          }`}
-        />
-      ))}
-    </div>
-  );
-}
-
-// ── Loading Skeletons ─────────────────────────────────────────────────────────
-
-function ServiceCardSkeleton() {
-  return (
-    <div className="min-w-[300px] sm:min-w-[340px] overflow-hidden rounded-2xl border bg-card">
-      <Skeleton className="h-52 w-full rounded-none" />
+    <div className="glass rounded-2xl overflow-hidden border border-purple-500/10 animate-pulse">
+      <div className="aspect-video bg-purple-500/10" />
       <div className="p-5 space-y-3">
-        <Skeleton className="h-5 w-3/4" />
-        <Skeleton className="h-4 w-1/2" />
-        <div className="flex items-center justify-between">
-          <Skeleton className="h-6 w-20" />
-          <Skeleton className="h-4 w-16" />
+        <div className="h-4 bg-purple-500/10 rounded-lg w-3/4" />
+        <div className="h-3 bg-purple-500/10 rounded-lg w-1/2" />
+        <div className="h-3 bg-purple-500/10 rounded-lg w-2/3" />
+        <div className="flex gap-3 pt-2">
+          <div className="h-3 bg-purple-500/10 rounded w-16" />
+          <div className="h-3 bg-purple-500/10 rounded w-20" />
         </div>
-        <Skeleton className="h-10 w-full mt-2" />
+        <div className="h-9 bg-purple-500/10 rounded-xl w-full mt-2" />
       </div>
     </div>
   );
 }
 
-function CategoryCardSkeleton() {
+// ─── Stat Counter Component ───────────────────────────────
+function StatItem({
+  icon,
+  value,
+  suffix,
+  label,
+  delay,
+}: {
+  icon: React.ReactNode;
+  value: number;
+  suffix?: string;
+  label: string;
+  delay: number;
+}) {
+  const { ref, value: count } = useCountUp({
+    end: value,
+    duration: 2200,
+    decimals: value % 1 !== 0 ? 1 : 0,
+  });
+
   return (
-    <div className="overflow-hidden rounded-2xl border bg-card">
-      <Skeleton className="h-56 w-full rounded-none" />
-    </div>
+    <motion.div
+      initial={{ opacity: 0, scale: 0.9 }}
+      whileInView={{ opacity: 1, scale: 1 }}
+      viewport={{ once: true }}
+      transition={{ delay, duration: 0.5 }}
+      className="glass rounded-2xl p-6 sm:p-8 text-center border border-purple-500/10"
+    >
+      <div className="w-14 h-14 rounded-xl bg-purple-500/10 flex items-center justify-center text-purple-400 mx-auto mb-5 pulse-glow-purple">
+        {icon}
+      </div>
+      <p ref={ref} className="text-3xl sm:text-4xl lg:text-5xl font-black text-gradient-gold mb-2 tabular-nums">
+        {value >= 1000 ? `${count.toLocaleString()}` : count}
+        {suffix}
+      </p>
+      <p className="text-xs sm:text-sm text-muted-foreground font-medium">{label}</p>
+    </motion.div>
   );
 }
 
-// ── Floating Particles Component ──────────────────────────────────────────────
-
-function FloatingParticles() {
-  const particles = [
-    { className: 'animate-float-1', style: 'top-[12%] left-[8%]', size: 'h-5 w-5' },
-    { className: 'animate-float-2', style: 'top-[22%] right-[12%]', size: 'h-3 w-3' },
-    { className: 'animate-float-3', style: 'top-[55%] left-[15%]', size: 'h-4 w-4' },
-    { className: 'animate-float-4', style: 'top-[40%] right-[18%]', size: 'h-6 w-6' },
-    { className: 'animate-float-5', style: 'top-[70%] left-[25%]', size: 'h-3.5 w-3.5' },
-    { className: 'animate-float-1', style: 'top-[65%] right-[8%]', size: 'h-4 w-4' },
-  ];
-
+// ─── Rating Stars ─────────────────────────────────────────
+function RatingStars({ rating }: { rating: number }) {
   return (
-    <div className="pointer-events-none absolute inset-0 overflow-hidden">
-      {particles.map((p, i) => (
-        <div
+    <div className="flex items-center gap-0.5">
+      {Array.from({ length: 5 }).map((_, i) => (
+        <Star
           key={i}
-          className={`absolute rounded-full ${p.className} ${p.size} ${
-            i % 2 === 0
-              ? 'border border-white/15 bg-white/5'
-              : 'border border-[#D4A853]/20 bg-[#D4A853]/8'
+          className={`w-3.5 h-3.5 ${
+            i < Math.round(rating) ? 'star-filled fill-current' : 'text-gray-600'
           }`}
-          style={{ ...{ [p.style.split(' ')[0]]: p.style.split(' ')[1], [p.style.split(' ')[2]]: p.style.split(' ')[3] } }}
         />
       ))}
     </div>
   );
 }
 
-// ── Section Title Component ───────────────────────────────────────────────────
-
-function SectionTitle({ label, title, description }: { label: string; title: string; description?: string }) {
-  return (
-    <motion.div
-      initial="hidden"
-      whileInView="visible"
-      viewport={{ once: true, margin: '-80px' }}
-      variants={staggerContainer}
-      className="mb-14 text-center sm:mb-20"
-    >
-      <motion.p
-        variants={fadeUp}
-        custom={0}
-        className="mb-3 text-sm font-semibold uppercase tracking-[0.2em] text-[#D4A853]"
-      >
-        {label}
-      </motion.p>
-      <motion.h2
-        variants={fadeUp}
-        custom={1}
-        className="text-gradient-gold text-3xl font-extrabold tracking-tight sm:text-4xl lg:text-5xl"
-      >
-        {title}
-      </motion.h2>
-      {description && (
-        <motion.p
-          variants={fadeUp}
-          custom={2}
-          className="mx-auto mt-4 max-w-2xl text-base text-muted-foreground sm:text-lg"
-        >
-          {description}
-        </motion.p>
-      )}
-      {/* Gradient underline decoration */}
-      <motion.div
-        variants={fadeIn}
-        className="mx-auto mt-6 h-1 w-24 rounded-full bg-gradient-to-r from-[#D4A853] via-[#F0D78C] to-[#D4A853]"
-      />
-    </motion.div>
-  );
-}
-
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+// ════════════════════════════════════════════════════════════════
 // MAIN COMPONENT
-// ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
-
+// ════════════════════════════════════════════════════════════════
 export default function HomePage() {
   const {
-    navigateTo,
-    t,
-    locale,
-    isRTL,
-    setSelectedCategoryId,
-    setSelectedServiceId,
-    setSearchQuery,
+    t, locale, isRTL,
+    navigateTo, setSelectedCategoryId, setSelectedServiceId,
+    searchQuery, setSearchQuery,
   } = useAppStore();
 
+  // ─── Data State ────────────────────────────────────────
   const [categories, setCategories] = useState<Category[]>([]);
   const [services, setServices] = useState<Service[]>([]);
-  const [loadingCategories, setLoadingCategories] = useState(true);
-  const [loadingServices, setLoadingServices] = useState(true);
-  const [searchInput, setSearchInput] = useState('');
+  const [loading, setLoading] = useState(true);
+  const [catLoading, setCatLoading] = useState(true);
 
-  // ── Fetch Categories ──────────────────────────────────────────────────────
-
+  // ─── Fetch Categories ──────────────────────────────────
   useEffect(() => {
     async function fetchCategories() {
       try {
         const res = await fetch('/api/categories');
-        const data = await res.json();
-        if (data.categories) setCategories(data.categories);
-      } catch (err) {
-        console.error('Failed to fetch categories:', err);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.categories?.length > 0) {
+            setCategories(data.categories);
+          }
+        }
+      } catch {
+        // silent fail
       } finally {
-        setLoadingCategories(false);
+        setCatLoading(false);
       }
     }
     fetchCategories();
   }, []);
 
-  // ── Fetch Featured Services ───────────────────────────────────────────────
-
+  // ─── Fetch Featured Services ───────────────────────────
   useEffect(() => {
     async function fetchServices() {
       try {
         const res = await fetch('/api/services?featured=true');
-        const data = await res.json();
-        if (data.services) setServices(data.services);
-      } catch (err) {
-        console.error('Failed to fetch services:', err);
+        if (res.ok) {
+          const data = await res.json();
+          if (data.services?.length > 0) {
+            setServices(data.services);
+          }
+        }
+      } catch {
+        // silent fail
       } finally {
-        setLoadingServices(false);
+        setLoading(false);
       }
     }
     fetchServices();
   }, []);
 
-  // ── Stats Counters ────────────────────────────────────────────────────────
-
-  const stat1 = useCountUp(10000, 2500);
-  const stat2 = useCountUp(500, 2000);
-  const stat3 = useCountUp(50, 1800);
-  const stat4 = useCountUp(4.9, 2200);
-
-  // ── Handlers ─────────────────────────────────────────────────────────────
+  // ─── Helpers ───────────────────────────────────────────
+  const name = (item: { nameAr: string; nameEn: string }) =>
+    locale === 'ar' ? item.nameAr : item.nameEn;
 
   const handleSearch = useCallback(
-    (e: React.FormEvent) => {
+    (e: FormEvent<HTMLFormElement>) => {
       e.preventDefault();
-      if (searchInput.trim()) {
-        setSearchQuery(searchInput.trim());
+      const formData = new FormData(e.currentTarget);
+      const q = formData.get('search') as string;
+      if (q?.trim()) {
+        setSearchQuery(q.trim());
         navigateTo('services');
       }
     },
-    [searchInput, setSearchQuery, navigateTo]
+    [setSearchQuery, navigateTo]
   );
 
-  const handleCategoryClick = useCallback(
-    (id: string) => {
-      setSelectedCategoryId(id);
-      navigateTo('services');
+  // ─── Bouncing scroll indicator ref ─────────────────────
+  const scrollRef = useRef<HTMLDivElement>(null);
+
+  // ─── Data for sections ─────────────────────────────────
+  const stats = [
+    {
+      icon: <Users className="w-6 h-6" />,
+      value: 10000,
+      suffix: '+',
+      label: locale === 'ar' ? 'مسافر سعيد' : 'Happy Travelers',
     },
-    [setSelectedCategoryId, navigateTo]
-  );
-
-  const handleServiceClick = useCallback(
-    (id: string) => {
-      setSelectedServiceId(id);
-      navigateTo('service-detail');
+    {
+      icon: <Shield className="w-6 h-6" />,
+      value: 500,
+      suffix: '+',
+      label: locale === 'ar' ? 'مزود خدمة موثوق' : 'Verified Providers',
     },
-    [setSelectedServiceId, navigateTo]
-  );
+    {
+      icon: <Compass className="w-6 h-6" />,
+      value: 50,
+      suffix: '+',
+      label: locale === 'ar' ? 'وجهة سياحية' : 'Destinations',
+    },
+    {
+      icon: <Star className="w-6 h-6" />,
+      value: 4.9,
+      suffix: '',
+      label: locale === 'ar' ? 'متوسط التقييم' : 'Average Rating',
+    },
+  ];
 
-  const DirectionIcon = isRTL ? ArrowLeft : ArrowRight;
+  const whyFeatures = [
+    {
+      icon: '🛡️',
+      title: locale === 'ar' ? 'مزودون موثقون' : 'Verified Providers',
+      desc:
+        locale === 'ar'
+          ? 'جميع مزودي الخدمة لدينا موثقون ومدققون بعناية لضمان تجارب آمنة وموثوقة'
+          : 'All our service providers are verified and carefully vetted to ensure safe and trustworthy experiences',
+    },
+    {
+      icon: '💎',
+      title: locale === 'ar' ? 'تجارب فاخرة' : 'Premium Experiences',
+      desc:
+        locale === 'ar'
+          ? 'رحلات سياحية مختارة بعناية تتميز بالفخامة والتميز لتحصل على أفضل تجربة'
+          : 'Handpicked luxury tours that stand out with excellence and distinction for the best experience',
+    },
+    {
+      icon: '🔒',
+      title: locale === 'ar' ? 'حجز آمن' : 'Secure Booking',
+      desc:
+        locale === 'ar'
+          ? 'دفع آمن ومحمي مع تأكيد فوري للحجز واسترداد سهل للأموال'
+          : 'Safe and protected payments with instant booking confirmation and easy refunds',
+    },
+  ];
 
+  const testimonials = [
+    {
+      name: locale === 'ar' ? 'أحمد الراشد' : 'Ahmed Al-Rashid',
+      text:
+        locale === 'ar'
+          ? 'تجربة لا تُنسى! أفضل خدمة سفاري جربتها على الإطلاق. المنصة سهلة الاستخدام والمزود محترف جداً.'
+          : 'An unforgettable experience! Best safari service I\'ve ever tried. The platform is easy to use and the provider is extremely professional.',
+      rating: 5,
+      avatar: '/images/avatar-1.png',
+    },
+    {
+      name: locale === 'ar' ? 'سارة محمد' : 'Sara Mohammed',
+      text:
+        locale === 'ar'
+          ? 'الحجز كان سهلاً جداً والتجربة فاقت توقعاتي. أنصح الجميع بتجربة منصة H.'
+          : 'Booking was super easy and the experience exceeded my expectations. I recommend everyone to try the H platform.',
+      rating: 5,
+      avatar: '/images/avatar-2.png',
+    },
+    {
+      name: locale === 'ar' ? 'خالد ناصر' : 'Khalid Nasser',
+      text:
+        locale === 'ar'
+          ? 'سأعود بالتأكيد! الأسعار معقولة والخدمة ممتازة. فريق الدعم متجاوب جداً.'
+          : 'Will definitely come back! Reasonable prices and excellent service. The support team is very responsive.',
+      rating: 5,
+      avatar: '/images/avatar-3.png',
+    },
+  ];
+
+  const containerVariants = {
+    hidden: {},
+    show: {
+      transition: { staggerChildren: 0.12 },
+    },
+  };
+
+  const itemVariants = {
+    hidden: { opacity: 0, y: 40 },
+    show: { opacity: 1, y: 0, transition: { duration: 0.6, ease: 'easeOut' } },
+  };
+
+  // ══════════════════════════════════════════════════════
+  // RENDER
+  // ══════════════════════════════════════════════════════
   return (
-    <main className="min-h-screen bg-background overflow-x-hidden">
-      {/* ═══════════════════════════════════════════════════════════════════════ */}
-      {/* 1. HERO SECTION — CINEMATIC                                          */}
-      {/* ═══════════════════════════════════════════════════════════════════════ */}
-      <section className="relative flex min-h-screen items-center justify-center overflow-hidden">
-        {/* Background Image */}
+    <div>
+      {/* ════════════════════════════════════════════════════════════
+          1. HERO SECTION — Full Viewport
+          ════════════════════════════════════════════════════════════ */}
+      <section className="relative min-h-screen flex items-center justify-center overflow-hidden">
+        {/* BG Image */}
         <div
           className="absolute inset-0 hero-bg"
-          style={{ backgroundImage: 'url(/images/hero-desert.png)' }}
+          style={{ backgroundImage: "url('/images/hero-desert.png')" }}
         />
 
-        {/* Animated Gradient Overlay */}
+        {/* Animated Purple Gradient Overlay */}
         <div className="absolute inset-0 animate-gradient-overlay" />
 
         {/* Giant "H" Watermark */}
-        <div className="absolute inset-0 flex items-center justify-center">
-          <span className="watermark-h select-none">H</span>
+        <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none">
+          <span className="watermark-h">H</span>
         </div>
 
-        {/* Floating Particles */}
-        <FloatingParticles />
+        {/* 3 Floating Purple Orbs */}
+        <div className="absolute top-[15%] left-[10%] w-72 h-72 bg-purple-500/20 rounded-full blur-3xl animate-orbit-1" />
+        <div className="absolute bottom-[20%] right-[15%] w-96 h-96 bg-purple-600/15 rounded-full blur-3xl animate-orbit-2" />
+        <div className="absolute top-[50%] right-[35%] w-64 h-64 bg-purple-400/10 rounded-full blur-3xl animate-orbit-3" />
 
-        {/* Hero Content */}
-        <div className="relative z-10 mx-auto max-w-5xl px-4 text-center sm:px-6 lg:px-8">
+        {/* ─── Hero Content ──────────────────────────────── */}
+        <div className="relative z-10 max-w-4xl mx-auto px-4 sm:px-6 text-center pt-28 pb-20">
           <motion.div
-            initial="hidden"
-            animate="visible"
-            variants={staggerContainer}
-            className="flex flex-col items-center gap-7"
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.8, ease: 'easeOut' }}
           >
-            {/* Brand Badge */}
-            <motion.div variants={fadeUp} custom={0}>
-              <Badge
-                variant="outline"
-                className="border-[#D4A853]/40 bg-[#D4A853]/10 px-5 py-2 text-sm text-[#F0D78C] backdrop-blur-sm"
-              >
-                <Sparkles className="me-2 size-4 fill-[#F0D78C]" />
-                {locale === 'ar' ? 'منصة السياحة الأولى في السعودية' : "Saudi Arabia's #1 Tourism Platform"}
-              </Badge>
-            </motion.div>
-
-            {/* Giant Title */}
-            <motion.h1
-              variants={fadeUp}
-              custom={1}
-              className="text-5xl font-black leading-[1.1] tracking-tight text-white sm:text-6xl md:text-7xl lg:text-8xl"
-              style={{ textShadow: '0 4px 30px rgba(0,0,0,0.4)' }}
-            >
-              {t('heroTitle')}
-            </motion.h1>
+            {/* Title */}
+            <h1 className="text-5xl md:text-7xl font-black leading-tight mb-6">
+              <span className="text-shimmer-purple">
+                {locale === 'ar' ? 'اكتشف' : 'Discover'}
+              </span>
+              <br />
+              <span className="text-shimmer-purple">
+                {locale === 'ar' ? 'المملكة مع' : 'the Kingdom with'}
+              </span>{' '}
+              <span className="text-gradient-gold">H</span>
+            </h1>
 
             {/* Subtitle */}
             <motion.p
-              variants={fadeUp}
-              custom={2}
-              className="mx-auto max-w-2xl text-lg text-white/80 sm:text-xl md:text-2xl"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.5 }}
+              className="text-white/70 text-lg max-w-2xl mx-auto mb-10 leading-relaxed"
             >
-              {t('heroSubtitle')}
+              {locale === 'ar'
+                ? 'رحلات سياحية فاخرة مع أفضل مزودي الخدمة الموثوقين في المملكة العربية السعودية'
+                : 'Luxury tourism experiences with the most trusted service providers in Saudi Arabia'}
             </motion.p>
 
-            {/* Search Bar — Glass Morphism + Gold Glow */}
+            {/* Search Bar */}
             <motion.form
-              variants={fadeUp}
-              custom={3}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.7 }}
               onSubmit={handleSearch}
-              className="mt-2 w-full max-w-2xl"
+              className="max-w-xl mx-auto mb-8"
             >
-              <div className="glass gold-glow-focus flex items-center gap-3 rounded-2xl border border-white/20 px-5 py-3.5">
-                <Search className="size-5 shrink-0 text-[#D4A853]" />
-                <input
-                  type="text"
-                  value={searchInput}
-                  onChange={(e) => setSearchInput(e.target.value)}
-                  placeholder={t('searchServices')}
-                  className="flex-1 bg-transparent text-sm text-white placeholder:text-white/50 focus:outline-none sm:text-base"
-                />
-                <Button
+              <div className="glass rounded-2xl p-2 flex items-center gap-2 purple-glow-focus border border-purple-500/20">
+                <div className="flex-1 flex items-center gap-3 px-4">
+                  <Search className="w-5 h-5 text-purple-400 shrink-0" />
+                  <input
+                    name="search"
+                    type="text"
+                    placeholder={
+                      locale === 'ar'
+                        ? 'ابحث عن تجارب ووجهات...'
+                        : 'Search experiences & destinations...'
+                    }
+                    defaultValue={searchQuery}
+                    className="w-full bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none py-2.5"
+                  />
+                </div>
+                <motion.button
+                  whileHover={{ scale: 1.03 }}
+                  whileTap={{ scale: 0.97 }}
                   type="submit"
-                  className="shrink-0 rounded-xl bg-gradient-gold px-6 font-semibold text-white shadow-lg shadow-[#D4A853]/20 transition-all hover:shadow-xl hover:shadow-[#D4A853]/30"
+                  className="btn-purple-gradient btn-shimmer px-6 py-2.5 rounded-xl text-sm font-semibold flex items-center gap-2 shrink-0"
                 >
-                  {locale === 'ar' ? 'بحث' : 'Search'}
-                </Button>
+                  <Search className="w-4 h-4" />
+                  <span className="hidden sm:inline">
+                    {locale === 'ar' ? 'بحث' : 'Search'}
+                  </span>
+                </motion.button>
               </div>
             </motion.form>
 
             {/* CTA Buttons */}
             <motion.div
-              variants={fadeUp}
-              custom={4}
-              className="mt-4 flex flex-wrap items-center justify-center gap-4"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.9 }}
+              className="flex flex-wrap items-center justify-center gap-3"
             >
-              <Button
-                size="lg"
+              <motion.button
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.97 }}
                 onClick={() => navigateTo('services')}
-                className="group gap-2 rounded-full bg-gradient-gold px-8 text-white font-bold shadow-xl shadow-[#D4A853]/25 transition-all hover:shadow-2xl hover:shadow-[#D4A853]/40 hover:scale-[1.02]"
+                className="btn-purple-gradient btn-shimmer px-8 py-3 rounded-xl font-semibold flex items-center gap-2 text-sm"
               >
-                {t('heroCta')}
-                <DirectionIcon className="size-4 transition-transform group-hover:translate-x-1" />
-              </Button>
-              <Button
-                variant="ghost"
-                size="lg"
+                {locale === 'ar' ? 'استكشف الخدمات' : 'Explore Services'}
+                <ArrowRight className="w-4 h-4" />
+              </motion.button>
+              <motion.button
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.97 }}
                 onClick={() => {
-                  const catSection = document.getElementById('categories-section');
-                  catSection?.scrollIntoView({ behavior: 'smooth' });
+                  const el = document.getElementById('categories-section');
+                  el?.scrollIntoView({ behavior: 'smooth' });
                 }}
-                className="gap-2 rounded-full border border-white/20 text-white backdrop-blur-sm hover:bg-white/10 hover:text-white"
+                className="px-8 py-3 rounded-xl border border-purple-500/30 bg-purple-500/5 text-purple-300 font-semibold text-sm flex items-center gap-2 hover:bg-purple-500/10 hover:border-purple-500/50 transition-all duration-300"
               >
-                {t('heroSecondary')}
-              </Button>
+                {locale === 'ar' ? 'تصفح الفئات' : 'Browse Categories'}
+              </motion.button>
             </motion.div>
           </motion.div>
         </div>
 
-        {/* Scroll Down Indicator */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          transition={{ delay: 2, duration: 1 }}
-          className="absolute bottom-8 left-1/2 z-10 -translate-x-1/2"
+        {/* Bouncing Scroll Indicator */}
+        <div
+          ref={scrollRef}
+          className="absolute bottom-8 left-1/2 -translate-x-1/2 z-10 flex flex-col items-center gap-1 animate-bounce"
         >
-          <div className="flex flex-col items-center gap-2">
-            <span className="text-xs tracking-widest text-white/40 uppercase">
-              {locale === 'ar' ? 'اكتشف المزيد' : 'Discover More'}
-            </span>
-            <motion.div
-              animate={{ y: [0, 8, 0] }}
-              transition={{ duration: 1.8, repeat: Infinity, ease: 'easeInOut' }}
-            >
-              <ChevronDown className="size-6 text-white/50" />
-            </motion.div>
-          </div>
-        </motion.div>
+          <span className="text-xs text-white/40 font-medium tracking-wider uppercase">
+            {locale === 'ar' ? 'اكتشف المزيد' : 'Scroll Down'}
+          </span>
+          <ChevronDown className="w-5 h-5 text-purple-400" />
+        </div>
+
+        {/* Bottom Fade */}
+        <div className="absolute bottom-0 left-0 right-0 h-32 bg-gradient-to-t from-background to-transparent" />
       </section>
 
-      {/* ═══════════════════════════════════════════════════════════════════════ */}
-      {/* 2. CATEGORIES SECTION — PREMIUM CARDS                                 */}
-      {/* ═══════════════════════════════════════════════════════════════════════ */}
-      <section id="categories-section" className="py-24 sm:py-32">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <SectionTitle
-            label={t('categoriesTitle')}
-            title={t('categoriesSubtitle')}
-          />
+      {/* ════════════════════════════════════════════════════════════
+          2. CATEGORIES SECTION
+          ════════════════════════════════════════════════════════════ */}
+      <section id="categories-section" className="py-20 bg-mesh-gradient">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6">
+          {/* Title */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="text-center mb-14"
+          >
+            <p className="text-xs text-purple-400 uppercase tracking-widest font-semibold mb-3">
+              {locale === 'ar' ? 'الفئات' : 'Categories'}
+            </p>
+            <h2 className="text-3xl sm:text-4xl font-bold text-gradient-purple">
+              {locale === 'ar' ? 'استكشف الفئات' : 'Explore Categories'}
+            </h2>
+          </motion.div>
 
           {/* Category Grid */}
-          <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 lg:grid-cols-3">
-            {loadingCategories
-              ? Array.from({ length: 6 }).map((_, i) => <CategoryCardSkeleton key={i} />)
-              : categories.slice(0, 6).map((cat, i) => (
-                  <motion.div
-                    key={cat.id}
-                    initial="hidden"
-                    whileInView="visible"
-                    viewport={{ once: true, margin: '-50px' }}
-                    variants={fadeUp}
-                    custom={i}
-                  >
-                    <button
-                      onClick={() => handleCategoryClick(cat.id)}
-                      className="group relative block h-56 w-full overflow-hidden rounded-2xl text-left focus:outline-none focus-visible:ring-2 focus-visible:ring-[#D4A853] focus-visible:ring-offset-2 transition-transform duration-500 hover:scale-[1.03]"
-                    >
-                      {/* Full Image Background */}
-                      <div
-                        className="absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-110"
-                        style={{ backgroundImage: `url(${cat.image})` }}
-                      />
+          {catLoading ? (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+              {[1, 2, 3, 4, 5, 6].map((i) => (
+                <div key={i} className="h-48 rounded-2xl bg-purple-500/10 animate-pulse" />
+              ))}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
+              {categories.slice(0, 6).map((cat, idx) => (
+                <motion.button
+                  key={cat.id}
+                  initial={{ opacity: 0, y: 30 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: idx * 0.08 }}
+                  whileHover={{ scale: 1.05 }}
+                  onClick={() => {
+                    setSelectedCategoryId(cat.id);
+                    navigateTo('services');
+                  }}
+                  className="group relative h-48 rounded-2xl overflow-hidden card-hover text-start cursor-pointer"
+                >
+                  {/* Background Image */}
+                  <div
+                    className="absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover:scale-110"
+                    style={{
+                      backgroundImage: cat.image
+                        ? `url(${cat.image})`
+                        : `url('/images/category-${cat.icon || 'adventure'}.png')`,
+                    }}
+                  />
 
-                      {/* Dark Gradient Overlay from Bottom */}
-                      <div className="absolute inset-0 bg-gradient-to-t from-black/85 via-black/40 to-transparent" />
+                  {/* Dark Gradient Overlay */}
+                  <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-black/20" />
 
-                      {/* Glass Overlay on Hover */}
-                      <div className="glass absolute inset-0 opacity-0 transition-opacity duration-300 group-hover:opacity-100" />
+                  {/* Content */}
+                  <div className="relative z-10 h-full flex flex-col justify-end p-6">
+                    {/* Icon */}
+                    <div className="text-purple-400 text-3xl mb-2">
+                      {getCategoryIcon(cat.icon)}
+                    </div>
 
-                      {/* Shimmer effect */}
-                      <div className="animate-shimmer absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-300" />
+                    {/* Name */}
+                    <h3 className="text-white font-semibold text-lg mb-2">{name(cat)}</h3>
 
-                      {/* Content */}
-                      <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 p-6">
-                        {/* Icon */}
-                        <div className="flex size-16 items-center justify-center rounded-2xl bg-[#D4A853]/20 backdrop-blur-sm text-[#F0D78C] transition-all duration-300 group-hover:scale-110 group-hover:bg-[#D4A853]/30 group-hover:shadow-lg group-hover:shadow-[#D4A853]/20">
-                          {iconMap[cat.icon] || <Compass className="size-8" />}
-                        </div>
+                    {/* Service Count Badge */}
+                    <div className="inline-flex self-start">
+                      <span className="bg-purple-500/20 text-purple-300 text-xs font-medium px-3 py-1 rounded-full">
+                        {cat.serviceCount}{' '}
+                        {locale === 'ar' ? 'خدمة' : 'services'}
+                      </span>
+                    </div>
 
-                        {/* Name */}
-                        <h3 className="text-xl font-bold text-white drop-shadow-lg">
-                          {locale === 'ar' ? cat.nameAr : cat.nameEn}
-                        </h3>
-
-                        {/* Service Count Badge */}
-                        <Badge className="border-0 bg-white/15 backdrop-blur-sm text-white/90 text-xs">
-                          {cat.serviceCount} {locale === 'ar' ? 'خدمة' : 'services'}
-                        </Badge>
-
-                        {/* Explore Text on Hover */}
-                        <span className="explore-text mt-1 flex items-center gap-1.5 text-sm font-medium text-[#F0D78C]">
-                          {locale === 'ar' ? 'استكشف' : 'Explore'}
-                          <DirectionIcon className="size-3.5" />
-                        </span>
-                      </div>
-                    </button>
-                  </motion.div>
-                ))}
-          </div>
+                    {/* Explore Text (revealed on hover) */}
+                    <span className="explore-text text-sm text-purple-300 font-medium mt-2 flex items-center gap-1">
+                      {locale === 'ar' ? 'استكشف الآن' : 'Explore Now'}{' '}
+                      <ArrowRight className="w-4 h-4" />
+                    </span>
+                  </div>
+                </motion.button>
+              ))}
+            </div>
+          )}
         </div>
       </section>
 
-      {/* ═══════════════════════════════════════════════════════════════════════ */}
-      {/* 3. FEATURED SERVICES — 3D CAROUSEL                                     */}
-      {/* ═══════════════════════════════════════════════════════════════════════ */}
-      <section className="bg-muted/30 py-24 sm:py-32">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <SectionTitle
-            label={locale === 'ar' ? 'خيارات موثوقة' : 'Top Picks'}
-            title={locale === 'ar' ? 'تجارب مميزة' : 'Featured Experiences'}
-            description={locale === 'ar' ? 'خدمات مختارة بعناية من أفضل مزودي الخدمات' : 'Handpicked experiences from the best service providers'}
-          />
+      {/* ════════════════════════════════════════════════════════════
+          3. FEATURED SERVICES SECTION
+          ════════════════════════════════════════════════════════════ */}
+      <section className="py-20">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6">
+          {/* Title */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="text-center mb-14"
+          >
+            <p className="text-xs text-gold uppercase tracking-widest font-semibold mb-3">
+              {locale === 'ar' ? 'المميزة' : 'Featured'}
+            </p>
+            <h2 className="text-3xl sm:text-4xl font-bold text-shimmer-gold">
+              {locale === 'ar' ? 'تجارب مميزة' : 'Featured Experiences'}
+            </h2>
+          </motion.div>
 
-          {/* Horizontal Scrollable Section with Snap */}
-          <div className="-mx-4 sm:-mx-6 lg:-mx-8">
-            <div className="scroll-snap-x flex gap-6 overflow-x-auto px-4 pb-4 sm:px-6 sm:gap-8 lg:px-8">
-              <AnimatePresence mode="wait">
-                {loadingServices
-                  ? Array.from({ length: 6 }).map((_, i) => <ServiceCardSkeleton key={`skel-${i}`} />)
-                  : services.slice(0, 8).map((service, i) => (
-                      <motion.div
-                        key={service.id}
-                        initial="hidden"
-                        whileInView="visible"
-                        viewport={{ once: true, margin: '-50px' }}
-                        variants={scaleIn}
-                        custom={i}
-                        className="card-3d min-w-[300px] max-w-[340px] flex-shrink-0 sm:min-w-[340px]"
-                      >
-                        <div className="card-3d-inner h-full">
-                          <Card className="card-hover group h-full overflow-hidden border-0 bg-card shadow-lg">
-                            {/* Image Container */}
-                            <div className="group/img relative aspect-video overflow-hidden">
-                              <div
-                                className="absolute inset-0 bg-cover bg-center transition-transform duration-700 group-hover/img:scale-110"
-                                style={{
-                                  backgroundImage: `url(${service.image || '/images/hero-desert.png'})`,
-                                }}
-                              />
-                              {/* Gradient Overlay on Image */}
-                              <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-transparent to-transparent" />
-
-                              {/* Floating Glass Price Tag */}
-                              <div className="absolute top-3 end-3">
-                                <div className="glass rounded-lg px-3 py-1.5 border border-white/20">
-                                  <span className="text-lg font-bold text-white">{service.price}</span>
-                                  <span className="ms-1 text-xs text-white/70">{t('sar')}</span>
-                                </div>
-                              </div>
-
-                              {/* Provider at bottom of image */}
-                              <div className="absolute bottom-3 start-3 flex items-center gap-2">
-                                <div className="flex size-8 items-center justify-center rounded-full bg-[#D4A853]/90 text-xs font-bold text-white shadow-md">
-                                  {service.provider.companyName.charAt(0).toUpperCase()}
-                                </div>
-                                <div>
-                                  <p className="text-xs font-medium text-white drop-shadow-md">
-                                    {service.provider.companyName}
-                                  </p>
-                                  {service.provider.verified && (
-                                    <span className="flex items-center gap-0.5 text-[10px] text-[#F0D78C]">
-                                      <Award className="size-2.5 fill-[#F0D78C]" />
-                                      {locale === 'ar' ? 'موثق' : 'Verified'}
-                                    </span>
-                                  )}
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Content */}
-                            <CardContent className="p-5">
-                              {/* Category */}
-                              <p className="mb-1.5 text-xs font-medium text-[#D4A853]">
-                                {locale === 'ar' ? service.category.nameAr : service.category.nameEn}
-                              </p>
-
-                              {/* Title */}
-                              <h3 className="mb-3 line-clamp-1 text-lg font-semibold leading-tight text-foreground">
-                                {locale === 'ar' ? service.titleAr : service.titleEn}
-                              </h3>
-
-                              {/* Star Rating + Reviews */}
-                              <div className="mb-3 flex items-center gap-2">
-                                <StarRating rating={service.rating} />
-                                <span className="text-sm font-semibold text-foreground">{service.rating}</span>
-                                <span className="text-xs text-muted-foreground">
-                                  ({service.totalReviews} {t('reviews')})
-                                </span>
-                              </div>
-
-                              {/* Duration + Location */}
-                              <div className="mb-4 flex items-center gap-4 text-xs text-muted-foreground">
-                                <span className="flex items-center gap-1.5">
-                                  <Clock className="size-3.5 text-[#D4A853]" />
-                                  {service.duration}
-                                </span>
-                                <span className="flex items-center gap-1.5">
-                                  <MapPin className="size-3.5 text-[#D4A853]" />
-                                  {service.location}
-                                </span>
-                              </div>
-
-                              {/* Book Now Button */}
-                              <Button
-                                className="w-full gap-2 rounded-xl bg-gradient-gold font-semibold text-white shadow-md shadow-[#D4A853]/15 transition-all hover:shadow-lg hover:shadow-[#D4A853]/30 hover:scale-[1.01]"
-                                onClick={() => handleServiceClick(service.id)}
-                              >
-                                {t('bookNow')}
-                                <DirectionIcon className="size-3.5" />
-                              </Button>
-                            </CardContent>
-                          </Card>
-                        </div>
-                      </motion.div>
-                    ))}
-              </AnimatePresence>
+          {loading ? (
+            /* 6 Skeleton Cards */
+            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+              {[1, 2, 3, 4, 5, 6].map((i) => (
+                <ServiceSkeleton key={i} />
+              ))}
             </div>
-          </div>
+          ) : (
+            <motion.div
+              variants={containerVariants}
+              initial="hidden"
+              whileInView="show"
+              viewport={{ once: true, margin: '-50px' }}
+              className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
+            >
+              {services.slice(0, 6).map((service) => (
+                <motion.div key={service.id} variants={itemVariants} className="card-3d">
+                  <div className="card-3d-inner">
+                    <div className="card-ornament card-hover glass rounded-2xl overflow-hidden border border-purple-500/10 group">
+                      {/* Image */}
+                      <div className="relative aspect-video overflow-hidden">
+                        {service.image ? (
+                          <img
+                            src={service.image}
+                            alt={name(service)}
+                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                          />
+                        ) : (
+                          <div className="w-full h-full bg-gradient-to-br from-purple-500/20 to-purple-900/30 flex items-center justify-center">
+                            <Compass className="w-12 h-12 text-purple-400/40" />
+                          </div>
+                        )}
+
+                        {/* Purple gradient overlay on image */}
+                        <div className="absolute inset-0 bg-gradient-to-t from-transparent via-transparent to-black/60" />
+
+                        {/* Price Tag — top-right, gold gradient pill */}
+                        <div className="absolute top-3 right-3 z-10">
+                          <span className="btn-gold-gradient rounded-full px-3 py-1 text-xs font-bold">
+                            {service.price}{' '}
+                            {locale === 'ar' ? 'ر.س' : (service.currency || 'SAR')}
+                          </span>
+                        </div>
+
+                        {/* Provider strip — bottom of image */}
+                        <div className="absolute bottom-0 left-0 right-0 z-10">
+                          <div className="glass px-4 py-2 flex items-center gap-2">
+                            <Shield className="w-3.5 h-3.5 text-purple-400 shrink-0" />
+                            <span className="text-xs text-white/80 font-medium truncate">
+                              {service.provider.companyName}
+                            </span>
+                            {service.provider.verified && (
+                              <Shield className="w-3 h-3 text-green-400 shrink-0" />
+                            )}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Content */}
+                      <div className="p-5">
+                        {/* Title */}
+                        <h3 className="text-white font-semibold text-base mb-2 line-clamp-1">
+                          {name(service)}
+                        </h3>
+
+                        {/* Rating Stars */}
+                        <div className="flex items-center gap-2 mb-3">
+                          <RatingStars rating={service.rating} />
+                          <span className="text-xs text-muted-foreground">
+                            {service.rating} ({service.totalReviews})
+                          </span>
+                        </div>
+
+                        {/* Duration + Location */}
+                        <div className="flex items-center gap-4 text-xs text-muted-foreground mb-4">
+                          <span className="flex items-center gap-1.5">
+                            <Clock className="w-3.5 h-3.5 text-purple-400" />
+                            {service.duration}
+                          </span>
+                          <span className="flex items-center gap-1.5">
+                            <MapPin className="w-3.5 h-3.5 text-purple-400" />
+                            {service.location}
+                          </span>
+                        </div>
+
+                        {/* Book Now */}
+                        <motion.button
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                          onClick={() => {
+                            setSelectedServiceId(service.id);
+                            navigateTo('service-detail');
+                          }}
+                          className="btn-purple-gradient btn-shimmer w-full py-2.5 rounded-xl text-sm font-semibold flex items-center justify-center gap-2"
+                        >
+                          {locale === 'ar' ? 'احجز الآن' : 'Book Now'}
+                          <ArrowRight className="w-4 h-4" />
+                        </motion.button>
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              ))}
+            </motion.div>
+          )}
 
           {/* View All Button */}
           <motion.div
-            initial="hidden"
-            whileInView="visible"
+            initial={{ opacity: 0 }}
+            whileInView={{ opacity: 1 }}
             viewport={{ once: true }}
-            variants={fadeUp}
-            custom={0}
-            className="mt-12 flex justify-center"
+            className="text-center mt-10"
           >
-            <Button
-              size="lg"
-              variant="outline"
+            <motion.button
+              whileHover={{ scale: 1.03 }}
+              whileTap={{ scale: 0.97 }}
               onClick={() => navigateTo('services')}
-              className="gap-2 rounded-full border-[#D4A853]/40 px-8 text-[#D4A853] transition-all hover:bg-[#D4A853] hover:text-white hover:border-[#D4A853]"
+              className="btn-purple-gradient btn-shimmer px-8 py-3 rounded-xl font-semibold text-sm flex items-center gap-2 mx-auto"
             >
-              {t('allServices')}
-              <DirectionIcon className="size-4" />
-            </Button>
+              {locale === 'ar' ? 'عرض جميع الخدمات' : 'View All Services'}
+              <ArrowRight className="w-4 h-4" />
+            </motion.button>
           </motion.div>
         </div>
       </section>
 
-      {/* ═══════════════════════════════════════════════════════════════════════ */}
-      {/* 4. STATS SECTION — ANIMATED                                          */}
-      {/* ═══════════════════════════════════════════════════════════════════════ */}
-      <section className="relative overflow-hidden bg-mesh-gradient py-24 sm:py-32">
-        <div className="mx-auto max-w-6xl px-4 sm:px-6 lg:px-8">
+      {/* ════════════════════════════════════════════════════════════
+          4. STATS SECTION
+          ════════════════════════════════════════════════════════════ */}
+      <section className="py-20 bg-mesh-gradient relative overflow-hidden">
+        {/* Top separator line */}
+        <div className="absolute top-0 left-0 right-0 h-px bg-gradient-to-r from-transparent via-purple-500/30 to-transparent" />
+
+        <div className="max-w-7xl mx-auto px-4 sm:px-6">
           <motion.div
-            initial="hidden"
-            whileInView="visible"
-            viewport={{ once: true, margin: '-80px' }}
-            variants={staggerContainer}
-            className="grid grid-cols-2 gap-6 sm:gap-8 lg:grid-cols-4"
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="text-center mb-14"
           >
-            {/* Stat 1 — Satisfied Travelers */}
-            <motion.div
-              ref={stat1.ref}
-              variants={fadeUp}
-              custom={0}
-              className="flex flex-col items-center gap-3 rounded-2xl border border-border/50 bg-card/80 p-6 text-center shadow-sm backdrop-blur-sm sm:p-8"
-            >
-              <div className="relative mb-1 flex size-16 items-center justify-center rounded-full bg-[#D4A853]/10 pulse-glow-ring">
-                <Users className="size-7 text-[#D4A853]" />
-              </div>
-              <span className="text-gradient-gold text-3xl font-black sm:text-4xl">
-                {stat1.count.toLocaleString()}+
-              </span>
-              <span className="text-sm font-medium text-muted-foreground">
-                {locale === 'ar' ? 'مسافر سعيد' : 'Satisfied Travelers'}
-              </span>
-            </motion.div>
-
-            {/* Stat 2 — Service Providers */}
-            <motion.div
-              ref={stat2.ref}
-              variants={fadeUp}
-              custom={1}
-              className="flex flex-col items-center gap-3 rounded-2xl border border-border/50 bg-card/80 p-6 text-center shadow-sm backdrop-blur-sm sm:p-8"
-            >
-              <div className="relative mb-1 flex size-16 items-center justify-center rounded-full bg-[#D4A853]/10 pulse-glow-ring">
-                <Building2 className="size-7 text-[#D4A853]" />
-              </div>
-              <span className="text-gradient-gold text-3xl font-black sm:text-4xl">
-                {stat2.count.toLocaleString()}+
-              </span>
-              <span className="text-sm font-medium text-muted-foreground">
-                {locale === 'ar' ? 'مزود خدمة' : 'Service Providers'}
-              </span>
-            </motion.div>
-
-            {/* Stat 3 — Destinations */}
-            <motion.div
-              ref={stat3.ref}
-              variants={fadeUp}
-              custom={2}
-              className="flex flex-col items-center gap-3 rounded-2xl border border-border/50 bg-card/80 p-6 text-center shadow-sm backdrop-blur-sm sm:p-8"
-            >
-              <div className="relative mb-1 flex size-16 items-center justify-center rounded-full bg-[#D4A853]/10 pulse-glow-ring">
-                <MapPin className="size-7 text-[#D4A853]" />
-              </div>
-              <span className="text-gradient-gold text-3xl font-black sm:text-4xl">
-                {stat3.count}+
-              </span>
-              <span className="text-sm font-medium text-muted-foreground">
-                {locale === 'ar' ? 'وجهة سياحية' : 'Destinations'}
-              </span>
-            </motion.div>
-
-            {/* Stat 4 — Average Rating */}
-            <motion.div
-              ref={stat4.ref}
-              variants={fadeUp}
-              custom={3}
-              className="flex flex-col items-center gap-3 rounded-2xl border border-border/50 bg-card/80 p-6 text-center shadow-sm backdrop-blur-sm sm:p-8"
-            >
-              <div className="relative mb-1 flex size-16 items-center justify-center rounded-full bg-[#D4A853]/10 pulse-glow-ring">
-                <Trophy className="size-7 text-[#D4A853]" />
-              </div>
-              <span className="text-gradient-gold text-3xl font-black sm:text-4xl">
-                {stat4.count}
-              </span>
-              <span className="text-sm font-medium text-muted-foreground">
-                {locale === 'ar' ? 'متوسط التقييم' : 'Average Rating'}
-              </span>
-            </motion.div>
+            <h2 className="text-3xl sm:text-4xl font-bold text-gradient-purple">
+              {locale === 'ar' ? 'أرقامنا تتحدث' : 'Our Numbers Speak'}
+            </h2>
           </motion.div>
+
+          <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
+            {stats.map((stat, idx) => (
+              <StatItem key={stat.label} {...stat} delay={idx * 0.1} />
+            ))}
+          </div>
         </div>
       </section>
 
-      {/* ═══════════════════════════════════════════════════════════════════════ */}
-      {/* 5. TESTIMONIALS SECTION — ELEGANT CARDS                               */}
-      {/* ═══════════════════════════════════════════════════════════════════════ */}
-      <section className="py-24 sm:py-32">
-        <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
-          <SectionTitle
-            label={locale === 'ar' ? 'آراء المسافرين' : 'Traveler Reviews'}
-            title={locale === 'ar' ? 'ماذا يقول عملاؤنا' : 'What Our Customers Say'}
-          />
+      {/* ════════════════════════════════════════════════════════════
+          5. WHY H? SECTION
+          ════════════════════════════════════════════════════════════ */}
+      <section className="py-20">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6">
+          {/* Title */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="text-center mb-14"
+          >
+            <p className="text-xs text-gold uppercase tracking-widest font-semibold mb-3">
+              Why H?
+            </p>
+            <h2 className="text-3xl sm:text-4xl font-bold text-gradient-mixed">
+              {locale === 'ar' ? 'لماذا تختار H؟' : 'Why Choose H?'}
+            </h2>
+          </motion.div>
 
-          {/* Testimonials Grid */}
-          <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
-            {testimonials.map((testimonial, i) => (
+          {/* Feature Cards */}
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+            {whyFeatures.map((feature, idx) => (
               <motion.div
-                key={testimonial.id}
-                initial="hidden"
-                whileInView="visible"
-                viewport={{ once: true, margin: '-50px' }}
-                variants={fadeUp}
-                custom={i}
+                key={idx}
+                initial={{ opacity: 0, y: 30 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                viewport={{ once: true }}
+                transition={{ delay: idx * 0.12 }}
+                whileHover={{ y: -6 }}
+                className="card-ornament corner-ornament glass rounded-2xl p-8 text-center border border-purple-500/10 glow-purple group"
               >
-                <Card className="testimonial-card gold-glow group h-full border border-[#D4A853]/15 bg-card p-7 transition-all duration-300 hover:border-[#D4A853]/30 hover:shadow-xl">
-                  {/* Large Quote Mark */}
-                  <div className="relative mb-5">
-                    <Quote className="size-10 text-[#D4A853]/20" />
-                    <Quote className="absolute -top-1 -start-1 size-10 text-[#D4A853]/40" />
-                  </div>
+                {/* Icon with glow */}
+                <div className="text-5xl mb-5 group-hover:scale-110 transition-transform duration-500 glow-purple inline-block">
+                  {feature.icon}
+                </div>
 
-                  {/* Star Rating */}
-                  <div className="mb-4">
-                    <StarRating rating={testimonial.rating} size="md" />
-                  </div>
-
-                  {/* Quote Text */}
-                  <p className="mb-6 line-clamp-4 text-sm leading-relaxed text-muted-foreground">
-                    &ldquo;{locale === 'ar' ? testimonial.quoteAr : testimonial.quoteEn}&rdquo;
-                  </p>
-
-                  {/* Author */}
-                  <div className="flex items-center gap-3 border-t border-border/50 pt-5">
-                    <div className="flex size-11 items-center justify-center overflow-hidden rounded-full bg-[#D4A853]/10 border-2 border-[#D4A853]/20">
-                      <img
-                        src={testimonial.avatar}
-                        alt={locale === 'ar' ? testimonial.authorAr : testimonial.authorEn}
-                        className="h-full w-full object-cover rounded-full"
-                      />
-                    </div>
-                    <div>
-                      <p className="text-sm font-bold text-foreground">
-                        {locale === 'ar' ? testimonial.authorAr : testimonial.authorEn}
-                      </p>
-                      <p className="text-xs text-[#D4A853]">
-                        {locale === 'ar' ? testimonial.roleAr : testimonial.roleEn}
-                      </p>
-                    </div>
-                  </div>
-                </Card>
+                <h3 className="font-bold text-foreground text-xl mb-3">{feature.title}</h3>
+                <p className="text-sm text-muted-foreground leading-relaxed">{feature.desc}</p>
               </motion.div>
             ))}
           </div>
         </div>
       </section>
-    </main>
+
+      {/* ════════════════════════════════════════════════════════════
+          6. TESTIMONIALS SECTION
+          ════════════════════════════════════════════════════════════ */}
+      <section className="py-20 bg-mesh-gradient">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6">
+          {/* Title */}
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            className="text-center mb-14"
+          >
+            <p className="text-xs text-purple-400 uppercase tracking-widest font-semibold mb-3">
+              {locale === 'ar' ? 'آراء العملاء' : 'Testimonials'}
+            </p>
+            <h2 className="text-3xl sm:text-4xl font-bold text-gradient-mixed">
+              {locale === 'ar' ? 'ماذا يقول عملاؤنا' : 'What Our Clients Say'}
+            </h2>
+          </motion.div>
+
+          {/* Testimonial Cards */}
+          <motion.div
+            variants={containerVariants}
+            initial="hidden"
+            whileInView="show"
+            viewport={{ once: true, margin: '-50px' }}
+            className="grid grid-cols-1 md:grid-cols-3 gap-6"
+          >
+            {testimonials.map((item, idx) => (
+              <motion.div
+                key={idx}
+                variants={itemVariants}
+                className="testimonial-card glass rounded-2xl p-6 sm:p-8 border border-purple-500/10 hover:border-purple-500/25 transition-all duration-300"
+              >
+                {/* Large Quote Icon */}
+                <Quote className="w-10 h-10 text-purple-500/30 mb-5" />
+
+                {/* Text */}
+                <p className="text-sm text-muted-foreground leading-relaxed mb-6">
+                  {item.text}
+                </p>
+
+                {/* Author */}
+                <div className="flex items-center gap-3 pt-5 border-t border-purple-500/10">
+                  {/* Avatar */}
+                  <div className="w-11 h-11 rounded-full bg-gradient-to-br from-purple-600 to-purple-800 flex items-center justify-center text-white font-bold text-sm shrink-0">
+                    {item.name.charAt(0)}
+                  </div>
+                  <div className="flex-1 min-w-0">
+                    <p className="text-sm font-semibold text-foreground truncate">
+                      {item.name}
+                    </p>
+                    <div className="flex gap-0.5 mt-1">
+                      {Array.from({ length: 5 }).map((_, i) => (
+                        <Star
+                          key={i}
+                          className={`w-3.5 h-3.5 ${
+                            i < item.rating ? 'star-filled fill-current' : 'text-gray-600'
+                          }`}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              </motion.div>
+            ))}
+          </motion.div>
+        </div>
+      </section>
+    </div>
   );
 }
