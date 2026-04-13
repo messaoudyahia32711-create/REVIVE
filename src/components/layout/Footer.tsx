@@ -83,8 +83,9 @@ export default function Footer() {
               className="rounded-2xl bg-white/5 border border-purple-500/10 p-6"
             >
               <div className="flex items-center gap-2 mb-4">
-                <span className="text-4xl font-black text-gradient-gold tracking-tighter">
-                  H
+                <img src="/images/logo.png" alt="REVIVE" className="w-10 h-10 rounded-lg" />
+                <span className="text-2xl font-black tracking-tight text-gradient-gold">
+                  REVIVE
                 </span>
                 <span className="w-2 h-2 rounded-full bg-purple-500 pulse-glow-purple" />
               </div>
@@ -173,7 +174,7 @@ export default function Footer() {
                 </div>
                 <div className="flex items-center gap-2.5 text-xs text-gray-400/70">
                   <Mail className="w-3.5 h-3.5 text-purple-500 shrink-0" />
-                  <span>contact@h-medical.dz</span>
+                  <span>contact@revive.dz</span>
                 </div>
               </div>
             </motion.div>
@@ -232,7 +233,7 @@ export default function Footer() {
       <div className="border-t border-purple-500/10 bg-[#0d0520]">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-5 flex flex-col sm:flex-row items-center justify-between gap-3">
           <p className="text-xs text-purple-400/40">
-            &copy; {new Date().getFullYear()} H. {t('copyright')}
+            &copy; {new Date().getFullYear()} REVIVE. {t('copyright')}
           </p>
           <p className="text-xs text-purple-400/25 flex items-center gap-1">
             {isRTL ? 'صُمم بكل' : 'Crafted with'} <Heart className="w-3 h-3 text-purple-500/60" /> {isRTL ? '❤️ في الجزائر' : '❤️ in Algeria'}

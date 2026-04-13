@@ -315,14 +315,14 @@
 .hero-bg { background-size: cover; background-position: center; background-attachment: fixed; }
 
 /* Watermark */
-.watermark-h {
-  font-size: clamp(15rem, 30vw, 35rem);
+.watermark-revive {
+  font-size: clamp(8rem, 18vw, 20rem);
   font-weight: 900;
   line-height: 1;
   opacity: 0.04;
-  letter-spacing: -0.05em;
-  color: #8B5CF6;
-  text-shadow: 0 0 80px rgba(139, 92, 246, 0.2);
+  letter-spacing: -0.03em;
+  color: #D4A853;
+  text-shadow: 0 0 80px rgba(212, 168, 83, 0.15);
   user-select: none;
   pointer-events: none;
 }

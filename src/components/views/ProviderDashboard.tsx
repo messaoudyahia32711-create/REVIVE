@@ -1219,9 +1219,7 @@ export default function ProviderDashboard() {
           <AnimatePresence mode="wait">
             {sidebarOpen && (
               <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex items-center gap-2.5">
-                <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-purple-600 to-purple-800 flex items-center justify-center shadow-lg shadow-purple-500/20">
-                  <span className="text-lg font-black text-white">H</span>
-                </div>
+                <img src="/images/logo.png" alt="REVIVE" className="w-9 h-9 rounded-xl" />
                 <div>
                   <p className="text-sm font-bold text-white leading-tight">{locale === 'ar' ? 'لوحة المزود' : 'Provider'}</p>
                   <p className="text-[10px] text-purple-400/60">Dashboard</p>
@@ -1230,8 +1228,8 @@ export default function ProviderDashboard() {
             )}
           </AnimatePresence>
           {!sidebarOpen && (
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-purple-600 to-purple-800 flex items-center justify-center mx-auto">
-              <span className="text-lg font-black text-white">H</span>
+            <div className="w-9 h-9 rounded-xl mx-auto">
+              <img src="/images/logo.png" alt="REVIVE" className="w-9 h-9 rounded-xl" />
             </div>
           )}
         </div>

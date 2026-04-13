@@ -266,8 +266,8 @@ export default function UserDashboard() {
           transition={{ type: 'spring', stiffness: 200, damping: 15 }}
           className="relative"
         >
-          <div className="text-5xl font-black text-gradient-purple select-none drop-shadow-lg">H</div>
-          <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-gradient-to-r from-transparent via-purple-400 to-transparent" />
+          <img src="/images/logo.png" alt="REVIVE" className="w-12 h-12 rounded-xl" />
+          <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-gradient-to-r from-transparent via-gold to-transparent" />
         </motion.div>
       </div>
 
@@ -347,7 +347,7 @@ export default function UserDashboard() {
             {renderSidebarContent()}
           </SheetContent>
         </Sheet>
-        <div className="text-2xl font-black text-gradient-purple">H</div>
+        <img src="/images/logo.png" alt="REVIVE" className="w-8 h-8 rounded-lg" />
         <Avatar className="h-8 w-8 ring-2 ring-purple-500/50">
           <AvatarImage src={user.avatar || undefined} />
           <AvatarFallback className="bg-gradient-to-br from-purple-600 to-purple-800 text-white text-xs font-bold">

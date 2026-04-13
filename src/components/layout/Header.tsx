@@ -192,17 +192,17 @@ export default function Header() {
             whileHover={{ scale: 1.05 }}
             whileTap={{ scale: 0.95 }}
             className="flex items-center gap-2 group"
-            aria-label="H - Home"
+            aria-label="REVIVE - Home"
           >
             <Image
               src="/images/logo.png"
-              alt="H Logo"
+              alt="REVIVE Logo"
               width={36}
               height={36}
               className="rounded-lg"
             />
-            <span className="text-2xl font-black text-gradient-purple tracking-tighter">
-              H
+            <span className="text-xl font-black tracking-tight text-gradient-gold">
+              REVIVE
             </span>
           </motion.button>
 
@@ -409,13 +409,13 @@ export default function Header() {
               >
                 <Image
                   src="/images/logo.png"
-                  alt="H Logo"
+                  alt="REVIVE Logo"
                   width={32}
                   height={32}
                   className="rounded-lg"
                 />
-                <span className="text-2xl font-black text-gradient-purple tracking-tighter">
-                  H
+                <span className="text-xl font-black tracking-tight text-gradient-gold">
+                  REVIVE
                 </span>
               </button>
               <SheetClose asChild>

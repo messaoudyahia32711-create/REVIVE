@@ -466,9 +466,9 @@ export default function HomePage() {
         {/* Animated Purple Gradient Overlay */}
         <div className="absolute inset-0 animate-gradient-overlay" />
 
-        {/* Giant "H" Watermark */}
+        {/* Giant REVIVE Watermark */}
         <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none">
-          <span className="watermark-h">H</span>
+          <span className="watermark-revive">REVIVE</span>
         </div>
 
         {/* 3 Floating Purple Orbs */}
@@ -492,7 +492,7 @@ export default function HomePage() {
               <span className="text-shimmer-purple">
                 {t('heroSubtitle')}
               </span>{' '}
-              <span className="text-gradient-gold">H</span>
+              <span className="text-gradient-gold">REVIVE</span>
             </h1>
 
             {/* Subtitle */}
@@ -867,7 +867,7 @@ export default function HomePage() {
       </section>
 
       {/* ════════════════════════════════════════════════════════════
-          5. WHY H? SECTION — Medical Tourism Advantages
+          5. WHY REVIVE? SECTION — Medical Tourism Advantages
           ════════════════════════════════════════════════════════════ */}
       <section className="py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
@@ -879,10 +879,10 @@ export default function HomePage() {
             className="text-center mb-14"
           >
             <p className="text-xs text-gold uppercase tracking-widest font-semibold mb-3">
-              Why H?
+              Why REVIVE?
             </p>
             <h2 className="text-3xl sm:text-4xl font-bold text-gradient-mixed">
-              {locale === 'ar' ? 'لماذا تختار H؟' : 'Why Choose H?'}
+              {locale === 'ar' ? 'لماذا تختار REVIVE؟' : 'Why Choose REVIVE?'}
             </h2>
             <p className="text-muted-foreground mt-3 max-w-lg mx-auto text-sm">
               {locale === 'ar'

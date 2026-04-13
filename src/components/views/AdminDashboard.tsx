@@ -222,11 +222,11 @@ export default function AdminDashboard() {
 
   const renderSidebarContent = () => (
     <div className="flex flex-col h-full">
-      {/* H Logo + Admin */}
+      {/* REVIVE Logo + Admin */}
       <div className="p-6 pb-4 flex flex-col items-center">
         <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
           transition={{ type: 'spring', stiffness: 200, damping: 15 }} className="relative">
-          <div className="text-5xl font-black text-gradient-purple select-none drop-shadow-lg">H</div>
+          <img src="/images/logo.png" alt="REVIVE" className="w-14 h-14 rounded-xl" />
           <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-gradient-to-r from-transparent via-gold to-transparent" />
         </motion.div>
         <p className="text-[11px] font-bold tracking-[0.3em] text-gradient-gold uppercase mt-1.5 flex items-center gap-1">
@@ -951,7 +951,7 @@ export default function AdminDashboard() {
               <Zap className="w-3.5 h-3.5 text-purple-400" />
               <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">{locale === 'ar' ? 'اسم المنصة' : 'Platform Name'}</p>
             </div>
-            <p className="text-sm font-bold text-white">H - {locale === 'ar' ? 'منصة السياحة العلاجية' : 'Medical Tourism Platform'}</p>
+            <p className="text-sm font-bold text-white">REVIVE - {locale === 'ar' ? 'منصة السياحة العلاجية' : 'Medical Tourism Platform'}</p>
           </div>
           <div className="px-4 py-3 rounded-xl bg-purple-500/5 border border-purple-500/10">
             <div className="flex items-center gap-2 mb-1">
@@ -1081,7 +1081,7 @@ export default function AdminDashboard() {
           </SheetContent>
         </Sheet>
         <div className="flex items-center gap-2">
-          <div className="text-2xl font-black text-gradient-purple">H</div>
+          <img src="/images/logo.png" alt="REVIVE" className="w-8 h-8 rounded-lg" />
           <Shield className="w-4 h-4 text-gold" />
         </div>
         <Avatar className="h-8 w-8 ring-2 ring-purple-500/50">

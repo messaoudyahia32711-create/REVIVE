@@ -233,8 +233,7 @@ export default function AuthPage() {
             className="text-center mb-8"
           >
             <button onClick={() => navigateTo('home')} className="inline-flex items-center gap-2 group">
-              <span className="text-5xl font-black text-shimmer-purple">H</span>
-              <span className="w-2.5 h-2.5 rounded-full bg-gold animate-pulse-gold mt-[-10px]" />
+              <img src="/images/logo.png" alt="REVIVE" className="w-14 h-14 rounded-xl" />
             </button>
             <h1 className="text-2xl font-black text-gradient-purple mt-4">
               {isLogin ? t('loginTitle') : t('registerTitle')}
@@ -632,7 +631,7 @@ export default function AuthPage() {
                     className="text-purple-400 hover:text-purple-300 font-bold transition-colors"
                   >
                     {isLogin
-                      ? (locale === 'ar' ? 'انضم إلى H' : 'Join H')
+                      ? (locale === 'ar' ? 'انضم إلى REVIVE' : 'Join REVIVE')
                       : t('loginBtn')}
                   </button>
                 </p>

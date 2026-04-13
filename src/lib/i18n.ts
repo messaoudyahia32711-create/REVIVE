@@ -1,6 +1,6 @@
 // =============================================================================
 // i18n - Internationalization Translation System
-// Platform: H - Medical Tourism Algeria
+// Platform: REVIVE - Medical Tourism Algeria
 // Supports: Arabic (ar) and English (en)
 // =============================================================================
 
