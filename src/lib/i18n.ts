@@ -63,6 +63,11 @@ const translations = {
     noServicesFound: 'No services found matching your criteria',
     filterByWilaya: 'Filter by Wilaya',
     allWilayas: 'All Wilayas',
+    filterByRating: 'Filter by Rating',
+    allRatings: 'All Ratings',
+    ratingAndUp: 'and up',
+    reviewSubmitted: 'Review submitted successfully!',
+    alreadyReviewed: 'You have already reviewed this service',
 
     // ── Booking ────────────────────────────────────────────────────────────
     bookingTitle: 'Book Appointment',
@@ -217,6 +222,11 @@ const translations = {
     noServicesFound: 'لم يتم العثور على خدمات مطابقة لمعاييرك',
     filterByWilaya: 'تصفية حسب الولاية',
     allWilayas: 'جميع الولايات',
+    filterByRating: 'تصفية حسب التقييم',
+    allRatings: 'جميع التقييمات',
+    ratingAndUp: 'فما فوق',
+    reviewSubmitted: 'تم إرسال التقييم بنجاح!',
+    alreadyReviewed: 'لقد قمت بتقييم هذه الخدمة مسبقاً',
 
     // ── Booking ────────────────────────────────────────────────────────────
     bookingTitle: 'حجز موعد',

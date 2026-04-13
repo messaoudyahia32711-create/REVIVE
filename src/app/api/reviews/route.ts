@@ -53,6 +53,17 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    // Prevent duplicate reviews by same user on same service
+    const existingReview = await db.review.findFirst({
+      where: { userId, serviceId },
+    });
+    if (existingReview) {
+      return NextResponse.json(
+        { error: 'You have already reviewed this service' },
+        { status: 409 }
+      );
+    }
+
     const review = await db.review.create({
       data: {
         userId,

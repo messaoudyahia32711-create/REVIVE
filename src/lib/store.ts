@@ -58,6 +58,10 @@ interface AppState {
   selectedWilaya: string | null;
   setSelectedWilaya: (wilaya: string | null) => void;
 
+  // Min rating filter (0 = no filter, 1-5)
+  minRating: number;
+  setMinRating: (rating: number) => void;
+
   // Booking form
   bookingDate: string;
   setBookingDate: (date: string) => void;
@@ -131,6 +135,10 @@ export const useAppStore = create<AppState>((set, get) => ({
   // Selected wilaya
   selectedWilaya: null,
   setSelectedWilaya: (wilaya) => set({ selectedWilaya: wilaya }),
+
+  // Min rating filter
+  minRating: 0,
+  setMinRating: (rating) => set({ minRating: rating }),
 
   // Booking form
   bookingDate: '',

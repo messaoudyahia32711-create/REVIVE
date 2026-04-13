@@ -12,6 +12,7 @@ export async function GET(request: NextRequest) {
     const providerId = searchParams.get('providerId');
     const sort = searchParams.get('sort');
     const wilaya = searchParams.get('wilaya');
+    const minRating = searchParams.get('minRating');
 
     // Build where clause
     // When providerId is specified, show ALL services (including inactive) so provider can manage them
@@ -31,6 +32,10 @@ export async function GET(request: NextRequest) {
 
     if (wilaya) {
       where.wilaya = wilaya;
+    }
+
+    if (minRating) {
+      where.rating = { gte: parseFloat(minRating) };
     }
 
     if (search) {

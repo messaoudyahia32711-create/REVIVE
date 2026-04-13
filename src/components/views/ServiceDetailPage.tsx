@@ -85,9 +85,12 @@ export default function ServiceDetailPage() {
   const [loading, setLoading] = useState(true);
   const [bookingLoading, setBookingLoading] = useState(false);
   const [relatedServices, setRelatedServices] = useState<RelatedService[]>([]);
-  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewRating, setReviewRating] = useState(0);
   const [reviewComment, setReviewComment] = useState('');
   const [submittingReview, setSubmittingReview] = useState(false);
+
+  // Check if current user already reviewed
+  const userAlreadyReviewed = isAuthenticated && user && reviews.some(r => r.user.id === user.id);
 
   /* ── Fetch service detail ─────────────────────────────────────────────── */
   const fetchService = useCallback(async () => {
@@ -199,7 +202,7 @@ export default function ServiceDetailPage() {
 
   /* ── Review handler ───────────────────────────────────────────────────── */
   const handleReview = async () => {
-    if (!isAuthenticated || !user || !service || !reviewComment.trim()) return;
+    if (!isAuthenticated || !user || !service || reviewRating < 1) return;
     setSubmittingReview(true);
     try {
       const res = await fetch('/api/reviews', {
@@ -209,11 +212,11 @@ export default function ServiceDetailPage() {
           userId: user.id,
           serviceId: service.id,
           rating: reviewRating,
-          comment: reviewComment,
+          comment: reviewComment.trim() || null,
         }),
       });
       if (res.ok) {
-        showToast(t('success'), 'success');
+        showToast(t('reviewSubmitted'), 'success');
         setReviewComment('');
         setReviewRating(5);
         // Refresh reviews
@@ -224,7 +227,11 @@ export default function ServiceDetailPage() {
         if (svcRes.ok) setService((await svcRes.json()).service);
       } else {
         const err = await res.json();
-        showToast(err.error || t('error'), 'error');
+        if (res.status === 409) {
+          showToast(t('alreadyReviewed'), 'error');
+        } else {
+          showToast(err.error || t('error'), 'error');
+        }
       }
     } catch {
       showToast(t('error'), 'error');
@@ -595,6 +602,19 @@ export default function ServiceDetailPage() {
 
               {/* Write Review (auth users only) */}
               {isAuthenticated ? (
+                userAlreadyReviewed ? (
+                  <div className="border-t border-purple-500/10 pt-6 text-center">
+                    <div className="flex items-center justify-center gap-2 mb-2">
+                      <Star className="w-5 h-5 text-amber-400 fill-current" />
+                      <span className="text-sm font-semibold text-amber-400">
+                        {locale === 'ar' ? 'شكراً لتقييمك!' : 'Thanks for your review!'}
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {locale === 'ar' ? 'لقد قمت بتقييم هذه الخدمة مسبقاً' : 'You have already reviewed this service'}
+                    </p>
+                  </div>
+                ) : (
                 <div className="border-t border-purple-500/10 pt-6">
                   <h4 className="text-sm font-bold text-foreground mb-4">{t('writeReview')}</h4>
                   <div className="flex items-center gap-1 mb-4">
@@ -612,18 +632,21 @@ export default function ServiceDetailPage() {
                         <Star className="w-6 h-6" />
                       </motion.button>
                     ))}
+                    {reviewRating > 0 && (
+                      <span className="text-xs text-amber-400 ms-2 font-semibold">{reviewRating}/5</span>
+                    )}
                   </div>
                   <textarea
                     value={reviewComment}
                     onChange={(e) => setReviewComment(e.target.value)}
-                    placeholder={t('yourComment')}
+                    placeholder={locale === 'ar' ? 'أضف تعليقاً (اختياري)...' : 'Add a comment (optional)...'}
                     className="w-full bg-purple-500/5 border border-purple-500/15 rounded-xl px-4 py-3 text-sm text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-purple-500/40 focus:shadow-[0_0_20px_rgba(139,92,246,0.2)] transition-all resize-none h-20 mb-3"
                   />
                   <motion.button
                     whileHover={{ scale: 1.03 }}
                     whileTap={{ scale: 0.97 }}
                     onClick={handleReview}
-                    disabled={submittingReview || !reviewComment.trim()}
+                    disabled={submittingReview || reviewRating < 1}
                     className="btn-purple-gradient btn-shimmer px-6 py-2.5 rounded-xl text-sm font-semibold disabled:opacity-50 flex items-center gap-2"
                   >
                     {submittingReview ? (
@@ -636,6 +659,7 @@ export default function ServiceDetailPage() {
                     )}
                   </motion.button>
                 </div>
+                )
               ) : (
                 <div className="border-t border-purple-500/10 pt-6 text-center">
                   <p className="text-sm text-muted-foreground">

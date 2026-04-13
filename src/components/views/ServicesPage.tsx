@@ -117,6 +117,7 @@ export default function ServicesPage() {
     t, locale, isRTL, navigateTo,
     setSelectedServiceId, selectedCategoryId, setSelectedCategoryId,
     selectedWilaya, setSelectedWilaya,
+    minRating, setMinRating,
     searchQuery, setSearchQuery,
   } = useAppStore();
 
@@ -154,6 +155,7 @@ export default function ServicesPage() {
       if (selectedCategoryId) params.set('categoryId', selectedCategoryId);
       if (searchQuery) params.set('search', searchQuery);
       if (selectedWilaya) params.set('wilaya', selectedWilaya);
+      if (minRating > 0) params.set('minRating', String(minRating));
       if (sortBy) params.set('sort', sortBy);
       const res = await fetch(`/api/services?${params.toString()}`);
       if (res.ok) {
@@ -165,7 +167,7 @@ export default function ServicesPage() {
     } finally {
       setLoading(false);
     }
-  }, [selectedCategoryId, searchQuery, selectedWilaya, sortBy]);
+  }, [selectedCategoryId, searchQuery, selectedWilaya, minRating, sortBy]);
 
   useEffect(() => { fetchServices(); }, [fetchServices]);
 
@@ -205,12 +207,13 @@ export default function ServicesPage() {
     setSearchInput('');
     setSortBy('newest');
     setWilayaSearch('');
+    setMinRating(0);
   };
 
   const serviceName = (s: Service) => locale === 'ar' ? s.titleAr : s.titleEn;
   const serviceDesc = (s: Service) => locale === 'ar' ? s.descriptionAr : s.descriptionEn;
 
-  const isFiltered = !!(selectedCategoryId || searchQuery || selectedWilaya);
+  const isFiltered = !!(selectedCategoryId || searchQuery || selectedWilaya || minRating > 0);
 
   /* ── Card click handler ─────────────────────────────────────────────── */
   const handleCardClick = (serviceId: string) => {
@@ -449,6 +452,66 @@ export default function ServicesPage() {
           </div>
         </motion.div>
 
+        {/* ═══ Star Rating Filter ═══ */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.13 }}
+          className="mb-6"
+        >
+          <div className="flex items-center gap-3 flex-wrap">
+            <label className="text-xs text-muted-foreground font-medium flex items-center gap-1.5">
+              <Star className="w-3.5 h-3.5 text-amber-400" />
+              {t('filterByRating')}
+            </label>
+
+            {minRating > 0 && (
+              <motion.span
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-amber-500/20 border border-amber-500/30 text-amber-300 text-xs font-semibold"
+              >
+                <Star className="w-3 h-3 fill-current" />
+                {minRating}+ {locale === 'ar' ? 'نجوم' : 'stars'}
+                <button
+                  onClick={() => setMinRating(0)}
+                  className="hover:bg-white/20 rounded-full p-0.5 transition-colors"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </motion.span>
+            )}
+
+            <div className="flex items-center gap-1.5">
+              {[0, 1, 2, 3, 4, 5].map((star) => (
+                <motion.button
+                  key={star}
+                  whileHover={{ scale: 1.1 }}
+                  whileTap={{ scale: 0.95 }}
+                  onClick={() => setMinRating(star)}
+                  className={`flex items-center gap-1 px-3 py-1.5 rounded-xl text-xs font-medium transition-all duration-200 whitespace-nowrap ${
+                    minRating === star
+                      ? 'bg-amber-500/20 border border-amber-500/40 text-amber-300 shadow-lg shadow-amber-500/10'
+                      : minRating === 0
+                        ? 'glass border border-purple-500/15 text-muted-foreground hover:text-amber-300'
+                        : 'glass border border-purple-500/10 text-muted-foreground/60 hover:text-amber-300'
+                  }`}
+                >
+                  {star === 0 ? (
+                    <span>{t('allRatings')}</span>
+                  ) : (
+                    <span className="flex items-center gap-1">
+                      <Star className={`w-3 h-3 ${minRating >= star ? 'text-amber-400 fill-current' : ''}`} />
+                      {star}+
+                    </span>
+                  )}
+                </motion.button>
+              ))}
+            </div>
+          </div>
+        </motion.div>
+
         {/* ═══ Category Filter Chips + Sort ═══ */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
@@ -464,7 +527,7 @@ export default function ServicesPage() {
               whileTap={{ scale: 0.95 }}
               onClick={clearFilters}
               className={`flex-shrink-0 px-5 py-2 rounded-xl text-xs font-semibold transition-all duration-300 whitespace-nowrap ${
-                !selectedCategoryId && !selectedWilaya && !searchQuery
+                !selectedCategoryId && !selectedWilaya && !searchQuery && minRating === 0
                   ? 'btn-purple-gradient text-white shadow-lg shadow-purple-500/25'
                   : 'glass border border-purple-500/15 text-muted-foreground glow-purple'
               }`}
