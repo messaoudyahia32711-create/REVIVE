@@ -109,3 +109,50 @@ export async function POST(request: NextRequest) {
     );
   }
 }
+
+// PATCH /api/auth - Update user profile
+export async function PATCH(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { userId, name, phone } = body;
+
+    if (!userId) {
+      return NextResponse.json(
+        { error: 'User ID is required' },
+        { status: 400 }
+      );
+    }
+
+    // Build update data (only include fields that are provided)
+    const updateData: Record<string, string> = {};
+    if (name !== undefined) updateData.name = name;
+    if (phone !== undefined) updateData.phone = phone || null;
+
+    if (Object.keys(updateData).length === 0) {
+      return NextResponse.json(
+        { error: 'No fields to update' },
+        { status: 400 }
+      );
+    }
+
+    const user = await db.user.update({
+      where: { id: userId },
+      data: updateData,
+      include: { provider: true },
+    });
+
+    const { password: _, ...userWithoutPassword } = user;
+    return NextResponse.json({
+      user: {
+        ...userWithoutPassword,
+        providerId: user.provider?.id || null,
+      },
+    });
+  } catch (error) {
+    console.error('Auth PATCH error:', error);
+    return NextResponse.json(
+      { error: 'Internal server error' },
+      { status: 500 }
+    );
+  }
+}

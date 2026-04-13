@@ -24,6 +24,8 @@ interface UserState {
   locale: Locale;
   providerId?: string;
   providerName?: string;
+  wilaya?: string;
+  createdAt?: string;
 }
 
 interface AppState {

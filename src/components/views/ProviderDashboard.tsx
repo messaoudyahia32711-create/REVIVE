@@ -6,7 +6,7 @@ import {
   LayoutDashboard, Package, CalendarCheck, MessageSquare, Settings,
   DollarSign, Star, Plus, Pencil, Trash2, ChevronLeft, ChevronRight,
   Send, MapPin, Users, Loader2, Award, TrendingUp, Menu, Sparkles,
-  CheckCircle2, XCircle, ShieldCheck, Clock, X,
+  CheckCircle2, XCircle, ShieldCheck, Clock, X, Globe, Building2, Eye, ChevronDown,
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -36,6 +36,7 @@ import {
 } from '@/components/ui/alert-dialog';
 import { useAppStore } from '@/lib/store';
 import { cn } from '@/lib/utils';
+import { WILAYAS, searchWilayas, getWilayaName } from '@/lib/wilayas';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
@@ -57,10 +58,17 @@ interface ServiceItem {
   id: string; providerId: string; categoryId: string;
   titleAr: string; titleEn: string; descriptionAr: string; descriptionEn: string;
   price: number; currency: string; duration: string; maxPeople: number;
-  location: string; image: string | null; images: string;
+  wilaya: string; location: string; image: string | null; images: string;
   rating: number; totalReviews: number; totalBookings: number;
   featured: boolean; createdAt: string; active: boolean;
   category?: { id: string; nameAr: string; nameEn: string; icon: string };
+}
+
+interface ProviderProfile {
+  id: string; userId: string; companyName: string; description: string | null;
+  wilaya: string | null; website: string | null; rating: number;
+  totalReviews: number; verified: boolean; createdAt: string; updatedAt: string;
+  user: { id: string; name: string; email: string; phone: string | null; avatar: string | null };
 }
 
 interface BookingItem {
@@ -85,7 +93,7 @@ interface CategoryItem {
 interface ServiceFormData {
   titleAr: string; titleEn: string; descriptionAr: string; descriptionEn: string;
   categoryId: string; price: string; duration: string; maxPeople: string;
-  location: string; image: string; featured: boolean;
+  wilaya: string; location: string; image: string; featured: boolean;
 }
 
 // ── Animation ──────────────────────────────────────────────────────────────
@@ -176,10 +184,15 @@ export default function ProviderDashboard() {
   const [editingService, setEditingService] = useState<ServiceItem | null>(null);
   const [serviceForm, setServiceForm] = useState<ServiceFormData>({
     titleAr: '', titleEn: '', descriptionAr: '', descriptionEn: '',
-    categoryId: '', price: '', duration: '', maxPeople: '1', location: '', image: '', featured: false,
+    categoryId: '', price: '', duration: '', maxPeople: '1', wilaya: '', location: '', image: '', featured: false,
   });
   const [savingService, setSavingService] = useState(false);
   const [deleteServiceId, setDeleteServiceId] = useState<string | null>(null);
+  const [wilayaSearch, setWilayaSearch] = useState('');
+  const [showWilayaDropdown, setShowWilayaDropdown] = useState(false);
+  const wilayaDropdownRef = useRef<HTMLDivElement>(null);
+
+  const [provider, setProvider] = useState<ProviderProfile | null>(null);
 
   const [bookings, setBookings] = useState<BookingItem[]>([]);
   const [bookingFilter, setBookingFilter] = useState('all');
@@ -192,6 +205,17 @@ export default function ProviderDashboard() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const providerId = user?.providerId;
+
+  // ── Wilaya dropdown close on outside click ──────────────────────────────
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (wilayaDropdownRef.current && !wilayaDropdownRef.current.contains(e.target as Node)) {
+        setShowWilayaDropdown(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, []);
 
   // ── Fetch ────────────────────────────────────────────────────────────────
 
@@ -233,13 +257,21 @@ export default function ProviderDashboard() {
     } catch { /* silent */ }
   }, []);
 
+  const fetchProvider = useCallback(async () => {
+    if (!providerId) return;
+    try {
+      const res = await fetch(`/api/providers/${providerId}`);
+      if (res.ok) { const d = await res.json(); setProvider(d.provider || null); }
+    } catch { /* silent */ }
+  }, [providerId]);
+
   useEffect(() => {
     (async () => {
       setLoading(true);
-      await Promise.all([fetchDashboard(), fetchServices(), fetchCategories(), fetchBookings()]);
+      await Promise.all([fetchDashboard(), fetchServices(), fetchCategories(), fetchBookings(), fetchProvider()]);
       setLoading(false);
     })();
-  }, [fetchDashboard, fetchServices, fetchCategories, fetchBookings]);
+  }, [fetchDashboard, fetchServices, fetchCategories, fetchBookings, fetchProvider]);
 
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
 
@@ -265,30 +297,41 @@ export default function ProviderDashboard() {
 
   const resetForm = () => {
     setServiceForm({ titleAr: '', titleEn: '', descriptionAr: '', descriptionEn: '',
-      categoryId: '', price: '', duration: '', maxPeople: '1', location: '', image: '', featured: false });
+      categoryId: '', price: '', duration: '', maxPeople: '1', wilaya: '', location: '', image: '', featured: false });
     setEditingService(null);
+    setWilayaSearch('');
+    setShowWilayaDropdown(false);
   };
 
-  const openAddService = () => { resetForm(); setServiceDialogOpen(true); };
+  const openAddService = () => {
+    resetForm();
+    // Default wilaya to the provider's own wilaya
+    if (provider?.wilaya) {
+      setServiceForm(prev => ({ ...prev, wilaya: provider.wilaya! }));
+    }
+    setServiceDialogOpen(true);
+  };
 
   const openEditService = (s: ServiceItem) => {
     setEditingService(s);
     setServiceForm({
       titleAr: s.titleAr, titleEn: s.titleEn, descriptionAr: s.descriptionAr, descriptionEn: s.descriptionEn,
       categoryId: s.categoryId, price: String(s.price), duration: s.duration,
-      maxPeople: String(s.maxPeople), location: s.location, image: s.image || '', featured: s.featured,
+      maxPeople: String(s.maxPeople), wilaya: s.wilaya || '', location: s.location, image: s.image || '', featured: s.featured,
     });
+    setWilayaSearch('');
+    setShowWilayaDropdown(false);
     setServiceDialogOpen(true);
   };
 
   const handleSaveService = async () => {
-    if (!providerId || !serviceForm.titleAr || !serviceForm.titleEn || !serviceForm.categoryId || !serviceForm.price || !serviceForm.duration || !serviceForm.location) {
-      showToast(locale === 'ar' ? 'يرجى ملء جميع الحقول المطلوبة' : 'Please fill all required fields', 'error');
+    if (!providerId || !serviceForm.titleAr || !serviceForm.titleEn || !serviceForm.categoryId || !serviceForm.price || !serviceForm.duration || !serviceForm.wilaya) {
+      showToast(locale === 'ar' ? 'يرجى ملء جميع الحقول المطلوبة (بما في ذلك الولاية)' : 'Please fill all required fields (including wilaya)', 'error');
       return;
     }
     setSavingService(true);
     try {
-      const body = { ...serviceForm, price: parseFloat(serviceForm.price), maxPeople: parseInt(serviceForm.maxPeople) || 1 };
+      const body = { ...serviceForm, price: parseFloat(serviceForm.price), maxPeople: parseInt(serviceForm.maxPeople) || 1, location: serviceForm.location || getWilayaName(serviceForm.wilaya, locale) };
       if (editingService) {
         const res = await fetch(`/api/services/${editingService.id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
         if (res.ok) { showToast(locale === 'ar' ? 'تم تحديث الخدمة' : 'Service updated', 'success'); fetchServices(); setServiceDialogOpen(false); resetForm(); }
@@ -712,6 +755,93 @@ export default function ProviderDashboard() {
               </div>
             </div>
 
+            {/* Wilaya Selector */}
+            <div className="space-y-2">
+              <Label className="text-xs font-semibold uppercase tracking-wider text-purple-300">
+                <MapPin className="w-3 h-3 inline me-1 text-purple-400" />
+                {locale === 'ar' ? 'الولاية' : 'Wilaya'} *
+              </Label>
+              <div className="relative" ref={wilayaDropdownRef}>
+                <button
+                  type="button"
+                  onClick={() => { setShowWilayaDropdown(!showWilayaDropdown); setWilayaSearch(''); }}
+                  className={cn(
+                    'w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm transition-all duration-200 border',
+                    'bg-purple-500/5 border-purple-500/15 text-white hover:border-purple-500/30 focus-visible:ring-2 focus-visible:ring-purple-500/30',
+                    !serviceForm.wilaya && 'text-muted-foreground',
+                  )}
+                >
+                  <span>
+                    {serviceForm.wilaya
+                      ? `${getWilayaName(serviceForm.wilaya, locale)} (${serviceForm.wilaya})`
+                      : (locale === 'ar' ? 'اختر ولاية...' : 'Select wilaya...')}
+                  </span>
+                  {serviceForm.wilaya && (
+                    <span
+                      role="button"
+                      onClick={(e) => { e.stopPropagation(); setServiceForm({ ...serviceForm, wilaya: '' }); setWilayaSearch(''); }}
+                      className="text-muted-foreground hover:text-white me-2"
+                    >
+                      <X className="w-3.5 h-3.5" />
+                    </span>
+                  )}
+                  <ChevronDown className={cn('w-4 h-4 text-muted-foreground transition-transform', showWilayaDropdown && 'rotate-180')} />
+                </button>
+                {showWilayaDropdown && (
+                  <div className="absolute z-50 mt-2 w-full rounded-xl glass border border-purple-500/15 bg-gray-950/98 shadow-2xl shadow-purple-500/10 overflow-hidden">
+                    <div className="p-2 border-b border-purple-500/10">
+                      <div className="relative">
+                        <input
+                          autoFocus
+                          type="text"
+                          placeholder={locale === 'ar' ? 'ابحث عن ولاية...' : 'Search wilaya...'}
+                          value={wilayaSearch}
+                          onChange={(e) => setWilayaSearch(e.target.value)}
+                          className="w-full bg-purple-500/5 border border-purple-500/15 rounded-lg px-3 py-2 text-sm text-white placeholder:text-muted-foreground focus:outline-none focus:border-purple-500/30"
+                        />
+                        {wilayaSearch && (
+                          <button type="button" onClick={() => setWilayaSearch('')}
+                            className="absolute end-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-white">
+                            <X className="w-3.5 h-3.5" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+                    <ScrollArea className="max-h-56">
+                      <div className="p-1">
+                        {searchWilayas(wilayaSearch).map((w) => {
+                          const isActive = serviceForm.wilaya === w.code;
+                          return (
+                            <button
+                              key={w.code}
+                              type="button"
+                              onClick={() => {
+                                setServiceForm({ ...serviceForm, wilaya: w.code });
+                                setShowWilayaDropdown(false);
+                                setWilayaSearch('');
+                              }}
+                              className={cn(
+                                'w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors',
+                                isActive ? 'bg-purple-500/20 text-purple-300' : 'text-white/80 hover:bg-purple-500/10 hover:text-white',
+                              )}
+                            >
+                              <span>{locale === 'ar' ? w.nameAr : w.nameEn}</span>
+                              <span className="text-xs text-muted-foreground ms-2">{w.code}</span>
+                            </button>
+                          );
+                        })}
+                        {searchWilayas(wilayaSearch).length === 0 && (
+                          <p className="text-center text-sm text-muted-foreground py-4">
+                            {locale === 'ar' ? 'لم يتم العثور على ولاية' : 'No wilaya found'}
+                          </p>
+                        )}
+                      </div>
+                    </ScrollArea>
+                  </div>
+                )}
+              </div>
+            </div>
+
             {/* Location, MaxPeople, Image */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="space-y-2">
@@ -943,26 +1073,167 @@ export default function ProviderDashboard() {
   // ── Settings Tab ─────────────────────────────────────────────────────────
 
   const renderSettingsTab = () => (
-    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
-      className="glass rounded-2xl p-6 border border-purple-500/10">
-      <h2 className="text-lg font-bold text-white flex items-center gap-2 mb-6">
+    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+      <h2 className="text-lg font-bold text-white flex items-center gap-2">
         <Settings className="h-5 w-5 text-purple-400" />
         {locale === 'ar' ? 'الإعدادات' : 'Settings'}
       </h2>
-      <div className="space-y-4">
-        <div className="px-4 py-3 rounded-xl bg-purple-500/5 border border-purple-500/10">
-          <p className="text-xs text-muted-foreground">{t('name')}</p>
-          <p className="text-sm font-semibold text-white mt-0.5">{user?.name}</p>
+
+      {provider ? (
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Provider Card */}
+          <motion.div variants={staggerItem} initial="hidden" animate="visible" className="lg:col-span-1">
+            <div className="glass rounded-2xl p-6 border border-purple-500/10 card-hover">
+              <div className="flex flex-col items-center text-center">
+                <div className="relative mb-4">
+                  <Avatar className="h-24 w-24 ring-4 ring-purple-500/20 shadow-xl shadow-purple-500/10">
+                    <AvatarImage src={provider.user.avatar || undefined} />
+                    <AvatarFallback className="bg-gradient-to-br from-purple-600 to-purple-800 text-white text-2xl font-bold">
+                      {provider.user.name.charAt(0)}
+                    </AvatarFallback>
+                  </Avatar>
+                  <div className="absolute -bottom-1 -end-1 bg-emerald-500 rounded-full p-1 border-3 border-gray-950">
+                    {provider.verified
+                      ? <ShieldCheck className="h-4 w-4 text-white" />
+                      : <Eye className="h-4 w-4 text-white" />}
+                  </div>
+                </div>
+                <h3 className="font-bold text-lg text-white">{provider.companyName}</h3>
+                <p className="text-sm text-muted-foreground mt-1">{provider.user.email}</p>
+                {provider.wilaya && (
+                  <p className="text-xs text-purple-400 flex items-center gap-1 mt-2">
+                    <MapPin className="w-3 h-3" /> {getWilayaName(provider.wilaya, locale)}
+                  </p>
+                )}
+                <div className="flex items-center gap-1 mt-3 text-gold star-filled">
+                  <Star className="h-4 w-4 fill-current" />
+                  <span className="text-sm font-bold">{provider.rating.toFixed(1)}</span>
+                  <span className="text-xs text-muted-foreground ms-1">
+                    ({provider.totalReviews} {locale === 'ar' ? 'تقييم' : 'reviews'})
+                  </span>
+                </div>
+                <div className="mt-3">
+                  <Badge className={cn(
+                    'px-3 py-1 rounded-lg text-[11px] font-bold border',
+                    provider.verified
+                      ? 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400'
+                      : 'bg-yellow-500/10 border-yellow-500/30 text-yellow-400',
+                  )}>
+                    {provider.verified
+                      ? (locale === 'ar' ? 'حساب موثّق' : 'Verified Account')
+                      : (locale === 'ar' ? 'بانتظار التوثيق' : 'Pending Verification')}
+                  </Badge>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+
+          {/* Profile Details */}
+          <motion.div variants={staggerItem} initial="hidden" animate="visible" className="lg:col-span-2">
+            <div className="glass rounded-2xl p-6 border border-purple-500/10 space-y-4">
+              <h3 className="font-bold text-white flex items-center gap-2 mb-4">
+                <Building2 className="h-4 w-4 text-purple-400" />
+                {locale === 'ar' ? 'معلومات الملف الشخصي' : 'Profile Information'}
+              </h3>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                <div className="px-4 py-3 rounded-xl bg-purple-500/5 border border-purple-500/10">
+                  <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+                    {locale === 'ar' ? 'اسم الشركة' : 'Company Name'}
+                  </p>
+                  <p className="text-sm font-semibold text-white mt-0.5">{provider.companyName}</p>
+                </div>
+                <div className="px-4 py-3 rounded-xl bg-purple-500/5 border border-purple-500/10">
+                  <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+                    {locale === 'ar' ? 'الاسم' : 'Name'}
+                  </p>
+                  <p className="text-sm font-semibold text-white mt-0.5">{provider.user.name}</p>
+                </div>
+                <div className="px-4 py-3 rounded-xl bg-purple-500/5 border border-purple-500/10">
+                  <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+                    {locale === 'ar' ? 'البريد الإلكتروني' : 'Email'}
+                  </p>
+                  <p className="text-sm font-semibold text-white mt-0.5">{provider.user.email}</p>
+                </div>
+                <div className="px-4 py-3 rounded-xl bg-purple-500/5 border border-purple-500/10">
+                  <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+                    {locale === 'ar' ? 'الهاتف' : 'Phone'}
+                  </p>
+                  <p className="text-sm font-semibold text-white mt-0.5">{provider.user.phone || '—'}</p>
+                </div>
+                <div className="px-4 py-3 rounded-xl bg-purple-500/5 border border-purple-500/10">
+                  <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+                    {locale === 'ar' ? 'الولاية' : 'Wilaya'}
+                  </p>
+                  <p className="text-sm font-semibold text-white mt-0.5">
+                    {provider.wilaya ? `${getWilayaName(provider.wilaya, locale)} (${provider.wilaya})` : '—'}
+                  </p>
+                </div>
+                <div className="px-4 py-3 rounded-xl bg-purple-500/5 border border-purple-500/10">
+                  <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">
+                    {locale === 'ar' ? 'التقييم' : 'Rating'}
+                  </p>
+                  <p className="text-sm font-semibold text-white mt-0.5 flex items-center gap-1">
+                    <Star className="h-3.5 w-3.5 text-gold fill-current" />
+                    {provider.rating.toFixed(1)}
+                    <span className="text-muted-foreground font-normal ms-1">({provider.totalReviews})</span>
+                  </p>
+                </div>
+              </div>
+
+              {provider.description && (
+                <div className="px-4 py-3 rounded-xl bg-purple-500/5 border border-purple-500/10">
+                  <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">
+                    {locale === 'ar' ? 'الوصف' : 'Description'}
+                  </p>
+                  <p className="text-sm text-white/90 leading-relaxed">{provider.description}</p>
+                </div>
+              )}
+
+              {provider.website && (
+                <div className="px-4 py-3 rounded-xl bg-purple-500/5 border border-purple-500/10">
+                  <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-wider mb-1">
+                    {locale === 'ar' ? 'الموقع الإلكتروني' : 'Website'}
+                  </p>
+                  <a
+                    href={provider.website.startsWith('http') ? provider.website : `https://${provider.website}`}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-sm text-purple-400 hover:text-purple-300 underline underline-offset-4 flex items-center gap-1.5"
+                  >
+                    <Globe className="w-3.5 h-3.5" />
+                    {provider.website}
+                  </a>
+                </div>
+              )}
+
+              <Separator className="bg-purple-500/10" />
+
+              <div className="flex items-center justify-between pt-2">
+                <div className="flex items-center gap-2">
+                  <p className="text-xs text-muted-foreground">
+                    {locale === 'ar' ? 'عضو منذ' : 'Member since'}
+                  </p>
+                  <p className="text-xs font-semibold text-white">
+                    {new Date(provider.createdAt).toLocaleDateString(locale === 'ar' ? 'ar-DZ' : 'en-US', {
+                      year: 'numeric', month: 'long', day: 'numeric',
+                    })}
+                  </p>
+                </div>
+                <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                  <Clock className="w-3 h-3" />
+                  <p>{locale === 'ar' ? 'آخر تحديث' : 'Last updated'}: {new Date(provider.updatedAt).toLocaleDateString()}</p>
+                </div>
+              </div>
+            </div>
+          </motion.div>
         </div>
-        <div className="px-4 py-3 rounded-xl bg-purple-500/5 border border-purple-500/10">
-          <p className="text-xs text-muted-foreground">{t('email')}</p>
-          <p className="text-sm font-semibold text-white mt-0.5">{user?.email}</p>
+      ) : (
+        <div className="glass rounded-2xl p-8 border border-purple-500/10 text-center">
+          <Loader2 className="w-8 h-8 text-purple-400 animate-spin mx-auto mb-3" />
+          <p className="text-sm text-muted-foreground">{locale === 'ar' ? 'جارٍ تحميل البيانات...' : 'Loading data...'}</p>
         </div>
-        <div className="px-4 py-3 rounded-xl bg-purple-500/5 border border-purple-500/10">
-          <p className="text-xs text-muted-foreground">{locale === 'ar' ? 'اسم الشركة' : 'Company Name'}</p>
-          <p className="text-sm font-semibold text-white mt-0.5">{user?.providerName || '—'}</p>
-        </div>
-      </div>
+      )}
     </motion.div>
   );
 

@@ -170,6 +170,8 @@ export default function AuthPage() {
           locale: locale,
           providerId: userData.providerId || undefined,
           providerName: userData.providerId ? userData.companyName : undefined,
+          wilaya: userData.wilaya || undefined,
+          createdAt: userData.createdAt || undefined,
         });
         showToast(
           isLogin

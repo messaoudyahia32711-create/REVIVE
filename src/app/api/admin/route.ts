@@ -1,5 +1,25 @@
-import { NextResponse } from 'next/server';
+import { NextRequest, NextResponse } from 'next/server';
 import { db } from '@/lib/db';
+
+export async function PATCH(request: NextRequest) {
+  try {
+    const body = await request.json();
+    const { action, providerId, verified } = body;
+
+    if (action === 'verify' && providerId) {
+      const provider = await db.provider.update({
+        where: { id: providerId },
+        data: { verified: !!verified },
+      });
+      return NextResponse.json({ provider });
+    }
+
+    return NextResponse.json({ error: 'Invalid action' }, { status: 400 });
+  } catch (error) {
+    console.error('Admin PATCH error:', error);
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 });
+  }
+}
 
 export async function GET() {
   try {

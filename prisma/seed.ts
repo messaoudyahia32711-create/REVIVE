@@ -15,7 +15,7 @@ async function main() {
   await prisma.user.deleteMany();
 
   // ─────────────────────────────────────────────
-  // 1. USERS (4 total: 2 patients + 2 providers)
+  // 1. USERS (5 total: 2 patients + 2 providers + 1 admin)
   // ─────────────────────────────────────────────
   console.log("👤 Creating users...");
 
@@ -67,7 +67,19 @@ async function main() {
     },
   });
 
-  console.log(`  ✓ Created 4 users\n`);
+  const adminUser = await prisma.user.create({
+    data: {
+      email: "admin@h.dz",
+      name: "مدير المنصة",
+      password: "admin123",
+      role: "admin",
+      phone: "+213555000000",
+      wilaya: "16",
+      locale: "ar",
+    },
+  });
+
+  console.log(`  ✓ Created 5 users\n`);
 
   // ─────────────────────────────────────────────
   // 2. PROVIDERS (2 total)
@@ -82,8 +94,8 @@ async function main() {
         "مركز متخصص في تقديم خدمات الرعاية الصحية الشاملة والعلاج الطبيعي في الجزائر العاصمة. نضم فريقاً من الأطباء المتخصصين ذوي الخبرة العالية في مختلف المجالات الطبية. نسعى لتقديم أفضل تجربة علاجية لمرضانا بأحدث التقنيات والمعدات الطبية.",
       wilaya: "16",
       website: "https://natural-health.dz",
-      rating: 4.8,
-      totalReviews: 45,
+      rating: 2.8,
+      totalReviews: 3,
       verified: true,
     },
   });
@@ -96,8 +108,8 @@ async function main() {
         "عيادة طبية متقدمة في مدينة قسنطينة تقدم خدمات طبية متنوعة تشمل الجلدية والعيون وأمراض القلب. نفتخر بفريق طبي متميز وبمعدات حديثة لضمان تشخيص دقيق وعلاج فعّال. نحرص على راحة المريض وتوفير بيئة علاجية مريحة وآمنة.",
       wilaya: "25",
       website: "https://al-shifa-clinic.dz",
-      rating: 4.9,
-      totalReviews: 32,
+      rating: 1.3,
+      totalReviews: 1,
       verified: true,
     },
   });
@@ -222,9 +234,9 @@ async function main() {
         wilaya: "16",
         location: "الجزائر",
         images: JSON.stringify([]),
-        rating: 4.7,
-        totalReviews: 38,
-        totalBookings: 120,
+        rating: 5,
+        totalReviews: 1,
+        totalBookings: 1,
         active: true,
         featured: true,
       },
@@ -248,9 +260,9 @@ async function main() {
         wilaya: "16",
         location: "الجزائر",
         images: JSON.stringify([]),
-        rating: 4.9,
-        totalReviews: 52,
-        totalBookings: 95,
+        rating: 4,
+        totalReviews: 1,
+        totalBookings: 0,
         active: true,
         featured: true,
       },
@@ -274,9 +286,9 @@ async function main() {
         wilaya: "16",
         location: "الجزائر",
         images: JSON.stringify([]),
-        rating: 4.6,
-        totalReviews: 67,
-        totalBookings: 210,
+        rating: 5,
+        totalReviews: 1,
+        totalBookings: 0,
         active: true,
         featured: true,
       },
@@ -300,9 +312,9 @@ async function main() {
         wilaya: "25",
         location: "قسنطينة",
         images: JSON.stringify([]),
-        rating: 4.8,
-        totalReviews: 29,
-        totalBookings: 78,
+        rating: 0,
+        totalReviews: 0,
+        totalBookings: 1,
         active: true,
         featured: true,
       },
@@ -326,9 +338,9 @@ async function main() {
         wilaya: "25",
         location: "قسنطينة",
         images: JSON.stringify([]),
-        rating: 4.5,
-        totalReviews: 18,
-        totalBookings: 55,
+        rating: 4,
+        totalReviews: 1,
+        totalBookings: 0,
         active: true,
         featured: false,
       },
@@ -352,9 +364,9 @@ async function main() {
         wilaya: "16",
         location: "الجزائر",
         images: JSON.stringify([]),
-        rating: 4.9,
-        totalReviews: 41,
-        totalBookings: 88,
+        rating: 0,
+        totalReviews: 0,
+        totalBookings: 1,
         active: true,
         featured: true,
       },
@@ -378,9 +390,9 @@ async function main() {
         wilaya: "25",
         location: "قسنطينة",
         images: JSON.stringify([]),
-        rating: 4.7,
-        totalReviews: 22,
-        totalBookings: 64,
+        rating: 0,
+        totalReviews: 0,
+        totalBookings: 0,
         active: true,
         featured: false,
       },
@@ -404,9 +416,9 @@ async function main() {
         wilaya: "16",
         location: "الجزائر",
         images: JSON.stringify([]),
-        rating: 4.8,
-        totalReviews: 35,
-        totalBookings: 102,
+        rating: 0,
+        totalReviews: 0,
+        totalBookings: 1,
         active: true,
         featured: true,
       },
@@ -590,7 +602,7 @@ async function main() {
   console.log("═".repeat(50));
   console.log("✅ Seed completed successfully!\n");
   console.log("📊 Summary:");
-  console.log("   Users:      4");
+  console.log("   Users:      5");
   console.log("   Providers:  2");
   console.log("   Categories: 9");
   console.log("   Services:   8");

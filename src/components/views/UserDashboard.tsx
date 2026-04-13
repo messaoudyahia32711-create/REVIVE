@@ -5,9 +5,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Calendar, MessageSquare, User, LogOut, Clock, Send, X,
   CheckCircle2, CreditCard, TrendingUp, Menu, ChevronRight,
-  Users, MapPin,
+  Users, MapPin, Shield, Mail, Save, Loader2,
 } from 'lucide-react';
 import { useAppStore } from '@/lib/store';
+import { getWilayaName } from '@/lib/wilayas';
 import { cn } from '@/lib/utils';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
@@ -70,6 +71,8 @@ const statusConfig: Record<string, { bg: string; text: string; border: string }>
 
 const filterTabs = ['all', 'pending', 'confirmed', 'completed', 'cancelled'] as const;
 
+type DashboardTab = 'bookings' | 'profile';
+
 // ── Animated Counter ───────────────────────────────────────────────────────
 
 function AnimatedCounter({ target, duration = 1200 }: { target: number; duration?: number }) {
@@ -105,6 +108,10 @@ export default function UserDashboard() {
   const [msgLoading, setMsgLoading] = useState(false);
   const [messageDialogOpen, setMessageDialogOpen] = useState(false);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [activeTab, setActiveTab] = useState<DashboardTab>('bookings');
+  const [editName, setEditName] = useState(user.name);
+  const [editPhone, setEditPhone] = useState(user.phone || '');
+  const [savingProfile, setSavingProfile] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   // ── Fetch ─────────────────────────────────────────────────────────────────
@@ -149,6 +156,46 @@ export default function UserDashboard() {
       if (res.ok) { const data = await res.json(); setMessages(prev => [...prev, data.message]); setMsgInput(''); }
     } catch { /* empty */ }
     finally { setMsgLoading(false); }
+  };
+
+  // Keep edit fields in sync when user changes
+  useEffect(() => {
+    setEditName(user.name);
+    setEditPhone(user.phone || '');
+  }, [user.name, user.phone]);
+
+  const handleSaveProfile = async () => {
+    if (!user) return;
+    setSavingProfile(true);
+    try {
+      const res = await fetch('/api/auth', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ userId: user.id, name: editName, phone: editPhone }),
+      });
+      if (res.ok) {
+        const data = await res.json();
+        setUser({
+          id: data.user.id,
+          email: data.user.email,
+          name: data.user.name,
+          role: data.user.role,
+          avatar: data.user.avatar || undefined,
+          phone: data.user.phone || undefined,
+          locale: locale,
+          providerId: data.user.providerId || undefined,
+          wilaya: data.user.wilaya || undefined,
+          createdAt: data.user.createdAt || undefined,
+        });
+        showToast(t('success'), 'success');
+      } else {
+        showToast(t('error'), 'error');
+      }
+    } catch {
+      showToast(t('error'), 'error');
+    } finally {
+      setSavingProfile(false);
+    }
   };
 
   const handleCancelBooking = async (bookingId: string) => {
@@ -201,9 +248,8 @@ export default function UserDashboard() {
   ];
 
   const navItems = [
-    { icon: Calendar, label: t('myBookings'), active: true },
-    { icon: MessageSquare, label: t('contactProvider'), active: false },
-    { icon: User, label: t('profile'), active: false },
+    { icon: Calendar, label: t('myBookings'), tab: 'bookings' as DashboardTab },
+    { icon: User, label: t('profile'), tab: 'profile' as DashboardTab },
   ];
 
   if (!user) return null;
@@ -249,15 +295,17 @@ export default function UserDashboard() {
       <nav className="flex-1 px-3 space-y-1">
         {navItems.map((item, idx) => {
           const Icon = item.icon;
+          const isActive = activeTab === item.tab;
           return (
             <motion.button
               key={item.label}
               initial={{ opacity: 0, x: isRTL ? 20 : -20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.1 + idx * 0.05 }}
+              onClick={() => { setActiveTab(item.tab); setSidebarOpen(false); }}
               className={cn(
                 'w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-300',
-                item.active
+                isActive
                   ? 'bg-purple-600/20 text-purple-300 border border-purple-500/20 shadow-[0_0_15px_rgba(139,92,246,0.1)]'
                   : 'text-white/60 hover:text-white hover:bg-white/8'
               )}
@@ -326,163 +374,349 @@ export default function UserDashboard() {
               <p className="text-sm text-muted-foreground mt-1">{t('dashboardTitle')}</p>
             </motion.div>
 
-            {/* Stat Cards */}
-            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
-              {stats.map((stat, idx) => {
-                const Icon = stat.icon;
-                return (
-                  <motion.div
-                    key={stat.label}
-                    initial={{ opacity: 0, y: 20 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    transition={{ delay: idx * 0.1 }}
-                    whileHover={{ y: -4, scale: 1.02 }}
-                    className="glass rounded-2xl p-5 border border-purple-500/10 glow-purple card-hover"
-                  >
-                    <div className="flex items-center justify-between">
-                      <div>
-                        <p className="text-xs text-muted-foreground uppercase tracking-wider mb-2">{stat.label}</p>
-                        <p className={cn('text-2xl font-black', stat.color)}>
-                          {stat.isText ? stat.value : <AnimatedCounter target={stat.value as number} />}
-                        </p>
-                      </div>
-                      <div className={cn('w-12 h-12 rounded-xl flex items-center justify-center pulse-glow-purple', stat.gradient)}>
-                        <Icon className="w-6 h-6 text-white" />
-                      </div>
-                    </div>
-                  </motion.div>
-                );
-              })}
-            </div>
-
-            {/* Filter Tabs */}
-            <div className="flex flex-wrap gap-2 mb-6">
-              {filterTabs.map((tab) => (
-                <motion.button
-                  key={tab}
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.95 }}
-                  onClick={() => setActiveFilter(tab)}
-                  className={cn(
-                    'px-4 py-2 rounded-xl text-xs font-semibold tracking-wide transition-all duration-300 border',
-                    activeFilter === tab
-                      ? 'btn-purple-gradient btn-shimmer text-white border-purple-500/30 shadow-lg shadow-purple-500/20'
-                      : 'glass text-muted-foreground hover:text-purple-300 border-purple-500/10 hover:border-purple-500/20'
-                  )}
-                >
-                  {filterLabel(tab)}
-                </motion.button>
-              ))}
-            </div>
-
-            {/* Bookings */}
-            {loading ? (
-              <div className="space-y-4">
-                {[1, 2, 3].map(i => (
-                  <Skeleton key={i} className="h-40 rounded-2xl bg-purple-500/5" />
-                ))}
-              </div>
-            ) : filtered.length === 0 ? (
+            <AnimatePresence mode="wait">
+            {activeTab === 'bookings' ? (
               <motion.div
-                initial={{ opacity: 0, scale: 0.95 }}
-                animate={{ opacity: 1, scale: 1 }}
-                className="glass rounded-2xl p-16 text-center border border-purple-500/10"
+                key="bookings"
+                initial={{ opacity: 0, x: isRTL ? 20 : -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: isRTL ? 20 : -20 }}
+                transition={{ duration: 0.2 }}
               >
-                <Calendar className="w-14 h-14 text-purple-500/20 mx-auto mb-4" />
-                <p className="text-muted-foreground mb-4">{t('noData')}</p>
-                <motion.button
-                  whileHover={{ scale: 1.03 }}
-                  whileTap={{ scale: 0.97 }}
-                  onClick={() => navigateTo('services')}
-                  className="btn-purple-gradient btn-shimmer px-6 py-2.5 rounded-xl text-sm font-semibold"
-                >
-                  {t('heroCta')}
-                </motion.button>
-              </motion.div>
-            ) : (
-              <div className="space-y-4">
-                <AnimatePresence>
-                  {filtered.map((booking, idx) => {
-                    const sc = statusConfig[booking.status] || statusConfig.pending;
+                {/* Stat Cards */}
+                <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-8">
+                  {stats.map((stat, idx) => {
+                    const Icon = stat.icon;
                     return (
                       <motion.div
-                        key={booking.id}
-                        initial={{ opacity: 0, y: 15 }}
+                        key={stat.label}
+                        initial={{ opacity: 0, y: 20 }}
                         animate={{ opacity: 1, y: 0 }}
-                        exit={{ opacity: 0, y: -10 }}
-                        transition={{ delay: idx * 0.05 }}
-                        className="card-ornament glass rounded-2xl p-5 border border-purple-500/10 card-hover"
+                        transition={{ delay: idx * 0.1 }}
+                        whileHover={{ y: -4, scale: 1.02 }}
+                        className="glass rounded-2xl p-5 border border-purple-500/10 glow-purple card-hover"
                       >
-                        <div className="flex flex-col sm:flex-row gap-4">
-                          {/* Image */}
-                          <div className="w-full sm:w-32 h-24 rounded-xl overflow-hidden flex-shrink-0">
-                            {booking.service.image ? (
-                              <img src={booking.service.image} alt="" className="w-full h-full object-cover" />
-                            ) : (
-                              <div className="w-full h-full bg-gradient-to-br from-purple-500/20 to-purple-900/20" />
-                            )}
+                        <div className="flex items-center justify-between">
+                          <div>
+                            <p className="text-xs text-muted-foreground uppercase tracking-wider mb-2">{stat.label}</p>
+                            <p className={cn('text-2xl font-black', stat.color)}>
+                              {stat.isText ? stat.value : <AnimatedCounter target={stat.value as number} />}
+                            </p>
                           </div>
-
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-start justify-between gap-2 mb-2">
-                              <h3 className="font-bold text-sm text-white truncate">{sn(booking)}</h3>
-                              <span className={cn('px-3 py-1 rounded-lg border text-[10px] font-bold uppercase tracking-wider flex-shrink-0', sc.bg, sc.text, sc.border)}>
-                                {statusLabel(booking.status)}
-                              </span>
-                            </div>
-
-                            <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground mb-3">
-                              <span className="flex items-center gap-1">
-                                <Calendar className="w-3 h-3 text-purple-400" />
-                                {new Date(booking.bookingDate).toLocaleDateString()}
-                              </span>
-                              <span className="flex items-center gap-1">
-                                <Users className="w-3 h-3 text-purple-400" />
-                                {booking.numberOfPeople} {locale === 'ar' ? 'أشخاص' : 'people'}
-                              </span>
-                              <span className="flex items-center gap-1">
-                                <Clock className="w-3 h-3 text-purple-400" />
-                                {booking.service.duration}
-                              </span>
-                              <span className="flex items-center gap-1">
-                                <MapPin className="w-3 h-3 text-purple-400" />
-                              </span>
-                            </div>
-
-                            <div className="flex items-center justify-between pt-3 border-t border-purple-500/10">
-                              <p className="text-lg font-black text-gradient-gold">
-                                {booking.totalPrice.toLocaleString()} <span className="text-xs text-gold/60">{t('dzd')}</span>
-                              </p>
-                              <div className="flex gap-2">
-                                <motion.button
-                                  whileHover={{ scale: 1.05 }}
-                                  whileTap={{ scale: 0.95 }}
-                                  onClick={() => openMessages(booking)}
-                                  className="px-3 py-1.5 rounded-lg glass border border-purple-500/15 text-xs text-purple-400 hover:bg-purple-500/10 transition-all flex items-center gap-1"
-                                >
-                                  <MessageSquare className="w-3 h-3" />
-                                  {t('contactProvider')}
-                                </motion.button>
-                                {booking.status === 'pending' && (
-                                  <motion.button
-                                    whileHover={{ scale: 1.05 }}
-                                    whileTap={{ scale: 0.95 }}
-                                    onClick={() => handleCancelBooking(booking.id)}
-                                    className="px-3 py-1.5 rounded-lg border border-red-500/15 bg-red-500/5 text-xs text-red-400 hover:bg-red-500/10 transition-all"
-                                  >
-                                    {t('cancelBooking')}
-                                  </motion.button>
-                                )}
-                              </div>
-                            </div>
+                          <div className={cn('w-12 h-12 rounded-xl flex items-center justify-center pulse-glow-purple', stat.gradient)}>
+                            <Icon className="w-6 h-6 text-white" />
                           </div>
                         </div>
                       </motion.div>
                     );
                   })}
-                </AnimatePresence>
-              </div>
+                </div>
+
+                {/* Filter Tabs */}
+                <div className="flex flex-wrap gap-2 mb-6">
+                  {filterTabs.map((tab) => (
+                    <motion.button
+                      key={tab}
+                      whileHover={{ scale: 1.05 }}
+                      whileTap={{ scale: 0.95 }}
+                      onClick={() => setActiveFilter(tab)}
+                      className={cn(
+                        'px-4 py-2 rounded-xl text-xs font-semibold tracking-wide transition-all duration-300 border',
+                        activeFilter === tab
+                          ? 'btn-purple-gradient btn-shimmer text-white border-purple-500/30 shadow-lg shadow-purple-500/20'
+                          : 'glass text-muted-foreground hover:text-purple-300 border-purple-500/10 hover:border-purple-500/20'
+                      )}
+                    >
+                      {filterLabel(tab)}
+                    </motion.button>
+                  ))}
+                </div>
+
+                {/* Bookings */}
+                {loading ? (
+                  <div className="space-y-4">
+                    {[1, 2, 3].map(i => (
+                      <Skeleton key={i} className="h-40 rounded-2xl bg-purple-500/5" />
+                    ))}
+                  </div>
+                ) : filtered.length === 0 ? (
+                  <motion.div
+                    initial={{ opacity: 0, scale: 0.95 }}
+                    animate={{ opacity: 1, scale: 1 }}
+                    className="glass rounded-2xl p-16 text-center border border-purple-500/10"
+                  >
+                    <Calendar className="w-14 h-14 text-purple-500/20 mx-auto mb-4" />
+                    <p className="text-muted-foreground mb-4">{t('noData')}</p>
+                    <motion.button
+                      whileHover={{ scale: 1.03 }}
+                      whileTap={{ scale: 0.97 }}
+                      onClick={() => navigateTo('services')}
+                      className="btn-purple-gradient btn-shimmer px-6 py-2.5 rounded-xl text-sm font-semibold"
+                    >
+                      {t('heroCta')}
+                    </motion.button>
+                  </motion.div>
+                ) : (
+                  <div className="space-y-4">
+                    <AnimatePresence>
+                      {filtered.map((booking, idx) => {
+                        const sc = statusConfig[booking.status] || statusConfig.pending;
+                        return (
+                          <motion.div
+                            key={booking.id}
+                            initial={{ opacity: 0, y: 15 }}
+                            animate={{ opacity: 1, y: 0 }}
+                            exit={{ opacity: 0, y: -10 }}
+                            transition={{ delay: idx * 0.05 }}
+                            className="card-ornament glass rounded-2xl p-5 border border-purple-500/10 card-hover"
+                          >
+                            <div className="flex flex-col sm:flex-row gap-4">
+                              {/* Image */}
+                              <div className="w-full sm:w-32 h-24 rounded-xl overflow-hidden flex-shrink-0">
+                                {booking.service.image ? (
+                                  <img src={booking.service.image} alt="" className="w-full h-full object-cover" />
+                                ) : (
+                                  <div className="w-full h-full bg-gradient-to-br from-purple-500/20 to-purple-900/20" />
+                                )}
+                              </div>
+
+                              <div className="flex-1 min-w-0">
+                                <div className="flex items-start justify-between gap-2 mb-2">
+                                  <h3 className="font-bold text-sm text-white truncate">{sn(booking)}</h3>
+                                  <span className={cn('px-3 py-1 rounded-lg border text-[10px] font-bold uppercase tracking-wider flex-shrink-0', sc.bg, sc.text, sc.border)}>
+                                    {statusLabel(booking.status)}
+                                  </span>
+                                </div>
+
+                                <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground mb-3">
+                                  <span className="flex items-center gap-1">
+                                    <Calendar className="w-3 h-3 text-purple-400" />
+                                    {new Date(booking.bookingDate).toLocaleDateString()}
+                                  </span>
+                                  <span className="flex items-center gap-1">
+                                    <Users className="w-3 h-3 text-purple-400" />
+                                    {booking.numberOfPeople} {locale === 'ar' ? 'أشخاص' : 'people'}
+                                  </span>
+                                  <span className="flex items-center gap-1">
+                                    <Clock className="w-3 h-3 text-purple-400" />
+                                    {booking.service.duration}
+                                  </span>
+                                  <span className="flex items-center gap-1">
+                                    <MapPin className="w-3 h-3 text-purple-400" />
+                                    {getWilayaName(booking.service.wilaya, locale)}
+                                  </span>
+                                </div>
+
+                                <div className="flex items-center justify-between pt-3 border-t border-purple-500/10">
+                                  <p className="text-lg font-black text-gradient-gold">
+                                    {booking.totalPrice.toLocaleString()} <span className="text-xs text-gold/60">{t('dzd')}</span>
+                                  </p>
+                                  <div className="flex gap-2">
+                                    <motion.button
+                                      whileHover={{ scale: 1.05 }}
+                                      whileTap={{ scale: 0.95 }}
+                                      onClick={() => openMessages(booking)}
+                                      className="px-3 py-1.5 rounded-lg glass border border-purple-500/15 text-xs text-purple-400 hover:bg-purple-500/10 transition-all flex items-center gap-1"
+                                    >
+                                      <MessageSquare className="w-3 h-3" />
+                                      {t('contactProvider')}
+                                    </motion.button>
+                                    {booking.status === 'pending' && (
+                                      <motion.button
+                                        whileHover={{ scale: 1.05 }}
+                                        whileTap={{ scale: 0.95 }}
+                                        onClick={() => handleCancelBooking(booking.id)}
+                                        className="px-3 py-1.5 rounded-lg border border-red-500/15 bg-red-500/5 text-xs text-red-400 hover:bg-red-500/10 transition-all"
+                                      >
+                                        {t('cancelBooking')}
+                                      </motion.button>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+                            </div>
+                          </motion.div>
+                        );
+                      })}
+                    </AnimatePresence>
+                  </div>
+                )}
+              </motion.div>
+            ) : (
+              /* ── Profile Tab ──────────────────────────────────────────────────── */
+              <motion.div
+                key="profile"
+                initial={{ opacity: 0, x: isRTL ? 20 : -20 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: isRTL ? 20 : -20 }}
+                transition={{ duration: 0.2 }}
+              >
+                <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                  {/* Profile Card */}
+                  <div className="lg:col-span-1">
+                    <motion.div
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className="glass rounded-2xl p-6 border border-purple-500/10 glow-purple text-center"
+                    >
+                      <div className="flex flex-col items-center">
+                        <Avatar className="h-24 w-24 ring-4 ring-purple-500/30 shadow-xl shadow-purple-500/20 mb-4">
+                          <AvatarImage src={user.avatar || undefined} />
+                          <AvatarFallback className="bg-gradient-to-br from-purple-600 to-purple-800 text-white text-2xl font-black">
+                            {user.name.charAt(0).toUpperCase()}
+                          </AvatarFallback>
+                        </Avatar>
+                        <h2 className="text-xl font-bold text-white mb-1">{user.name}</h2>
+                        <p className="text-sm text-muted-foreground mb-4">{user.email}</p>
+                        <Badge
+                          className={cn(
+                            'px-4 py-1 text-xs font-semibold border',
+                            user.role === 'provider'
+                              ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20'
+                              : 'bg-purple-500/10 text-purple-400 border-purple-500/20'
+                          )}
+                        >
+                          <Shield className="w-3 h-3 me-1.5" />
+                          {user.role === 'provider' ? t('providerRole') : t('userRole')}
+                        </Badge>
+                      </div>
+
+                      <Separator className="bg-purple-500/10 my-6" />
+
+                      {/* Quick Stats */}
+                      <div className="grid grid-cols-2 gap-4">
+                        <div className="text-center p-3 rounded-xl bg-purple-500/5 border border-purple-500/10">
+                          <p className="text-lg font-black text-purple-400">{bookings.length}</p>
+                          <p className="text-[10px] text-muted-foreground uppercase tracking-wider">{t('totalBookings')}</p>
+                        </div>
+                        <div className="text-center p-3 rounded-xl bg-purple-500/5 border border-purple-500/10">
+                          <p className="text-lg font-black text-gold">
+                            {bookings.filter(b => b.status === 'completed').reduce((s, b) => s + b.totalPrice, 0).toLocaleString()}
+                          </p>
+                          <p className="text-[10px] text-muted-foreground uppercase tracking-wider">{locale === 'ar' ? 'إجمالي الإنفاق' : 'Total Spent'}</p>
+                        </div>
+                      </div>
+                    </motion.div>
+                  </div>
+
+                  {/* Edit Profile Form */}
+                  <div className="lg:col-span-2">
+                    <motion.div
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: 0.1 }}
+                      className="glass rounded-2xl p-6 border border-purple-500/10 glow-purple"
+                    >
+                      <h3 className="text-lg font-bold text-white mb-6 flex items-center gap-2">
+                        <User className="w-5 h-5 text-purple-400" />
+                        {t('edit')} {t('profile')}
+                      </h3>
+
+                      <div className="space-y-5">
+                        {/* Name */}
+                        <div>
+                          <label className="block text-xs text-muted-foreground uppercase tracking-wider mb-2 font-medium">
+                            {t('name')}
+                          </label>
+                          <Input
+                            value={editName}
+                            onChange={(e) => setEditName(e.target.value)}
+                            className="bg-purple-500/5 border-purple-500/15 text-white focus-visible:ring-purple-500/30"
+                            placeholder={locale === 'ar' ? 'أدخل اسمك' : 'Enter your name'}
+                          />
+                        </div>
+
+                        {/* Email (read-only) */}
+                        <div>
+                          <label className="block text-xs text-muted-foreground uppercase tracking-wider mb-2 font-medium">
+                            {t('email')}
+                          </label>
+                          <div className="flex items-center gap-3 px-4 py-2.5 rounded-xl bg-purple-500/5 border border-purple-500/15 opacity-60">
+                            <Mail className="w-4 h-4 text-purple-400" />
+                            <span className="text-sm text-white">{user.email}</span>
+                          </div>
+                        </div>
+
+                        {/* Phone */}
+                        <div>
+                          <label className="block text-xs text-muted-foreground uppercase tracking-wider mb-2 font-medium">
+                            {t('phone')}
+                          </label>
+                          <Input
+                            value={editPhone}
+                            onChange={(e) => setEditPhone(e.target.value)}
+                            className="bg-purple-500/5 border-purple-500/15 text-white focus-visible:ring-purple-500/30"
+                            placeholder={locale === 'ar' ? 'أدخل رقم هاتفك' : 'Enter your phone number'}
+                          />
+                        </div>
+
+                        {/* Wilaya (read-only) */}
+                        <div>
+                          <label className="block text-xs text-muted-foreground uppercase tracking-wider mb-2 font-medium">
+                            {t('wilaya')}
+                          </label>
+                          <div className="flex items-center gap-3 px-4 py-2.5 rounded-xl bg-purple-500/5 border border-purple-500/15 opacity-60">
+                            <MapPin className="w-4 h-4 text-purple-400" />
+                            <span className="text-sm text-white">
+                              {user.wilaya ? getWilayaName(user.wilaya, locale) : (locale === 'ar' ? 'غير محدد' : 'Not set')}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Role (read-only) */}
+                        <div>
+                          <label className="block text-xs text-muted-foreground uppercase tracking-wider mb-2 font-medium">
+                            {t('role')}
+                          </label>
+                          <div className="flex items-center gap-3 px-4 py-2.5 rounded-xl bg-purple-500/5 border border-purple-500/15 opacity-60">
+                            <Shield className="w-4 h-4 text-purple-400" />
+                            <span className="text-sm text-white">
+                              {user.role === 'provider' ? t('providerRole') : t('userRole')}
+                            </span>
+                          </div>
+                        </div>
+
+                        {/* Member Since (read-only) */}
+                        {user.createdAt && (
+                          <div>
+                            <label className="block text-xs text-muted-foreground uppercase tracking-wider mb-2 font-medium">
+                              {locale === 'ar' ? 'تاريخ الانضمام' : 'Member Since'}
+                            </label>
+                            <div className="flex items-center gap-3 px-4 py-2.5 rounded-xl bg-purple-500/5 border border-purple-500/15 opacity-60">
+                              <Calendar className="w-4 h-4 text-purple-400" />
+                              <span className="text-sm text-white">
+                                {new Date(user.createdAt).toLocaleDateString(locale === 'ar' ? 'ar-DZ' : 'en-US', {
+                                  year: 'numeric', month: 'long', day: 'numeric',
+                                })}
+                              </span>
+                            </div>
+                          </div>
+                        )}
+
+                        <Separator className="bg-purple-500/10" />
+
+                        {/* Save Button */}
+                        <motion.button
+                          whileHover={{ scale: 1.02 }}
+                          whileTap={{ scale: 0.98 }}
+                          onClick={handleSaveProfile}
+                          disabled={savingProfile || (editName === user.name && editPhone === (user.phone || ''))}
+                          className="btn-purple-gradient btn-shimmer w-full sm:w-auto px-8 py-3 rounded-xl text-sm font-semibold flex items-center justify-center gap-2 disabled:opacity-50 disabled:cursor-not-allowed"
+                        >
+                          {savingProfile ? (
+                            <Loader2 className="w-4 h-4 animate-spin" />
+                          ) : (
+                            <Save className="w-4 h-4" />
+                          )}
+                          {t('save')}
+                        </motion.button>
+                      </div>
+                    </motion.div>
+                  </div>
+                </div>
+              </motion.div>
             )}
+            </AnimatePresence>
           </div>
         </main>
       </div>

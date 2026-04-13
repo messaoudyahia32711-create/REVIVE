@@ -483,6 +483,15 @@ export default function ServiceDetailPage() {
                 <motion.button
                   whileHover={{ scale: 1.05 }}
                   whileTap={{ scale: 0.95 }}
+                  onClick={() => {
+                    if (!isAuthenticated || !user) {
+                      showToast(locale === 'ar' ? 'يرجى تسجيل الدخول أولاً' : 'Please login first', 'error');
+                      navigateTo('login');
+                      return;
+                    }
+                    // Navigate to booking page where messaging is available
+                    showToast(locale === 'ar' ? 'قم بحجز الخدمة أولاً للتواصل مع المزود' : 'Book the service first to contact the provider', 'info');
+                  }}
                   className="btn-purple-gradient btn-shimmer px-4 py-2 rounded-xl text-xs font-semibold flex items-center gap-1.5"
                 >
                   <MessageSquare className="w-3.5 h-3.5" />

@@ -49,6 +49,26 @@ interface Service {
   };
 }
 
+// ─── Platform Stats Type ──────────────────────────────
+interface PlatformStats {
+  totalUsers: number;
+  totalProviders: number;
+  totalServices: number;
+  totalBookings: number;
+  totalReviews: number;
+  totalCategories: number;
+  completedBookings: number;
+  avgRating: number;
+  recentReviews: Array<{
+    id: string;
+    rating: number;
+    comment: string;
+    createdAt: string;
+    user: { name: string; avatar: string | null } | null;
+    service: { titleAr: string; titleEn: string } | null;
+  }>;
+}
+
 // ─── Medical Category Icon Map ────────────────────────────
 const categoryIconMap: Record<string, React.ReactNode> = {
   generalMedicine: <Stethoscope className="w-7 h-7" />,
@@ -280,6 +300,7 @@ export default function HomePage() {
   const [services, setServices] = useState<Service[]>([]);
   const [loading, setLoading] = useState(true);
   const [catLoading, setCatLoading] = useState(true);
+  const [platformStats, setPlatformStats] = useState<PlatformStats | null>(null);
 
   // ─── Fetch Categories ──────────────────────────────────
   useEffect(() => {
@@ -321,6 +342,22 @@ export default function HomePage() {
     fetchServices();
   }, []);
 
+  // ─── Fetch Platform Stats ────────────────────────────
+  useEffect(() => {
+    async function fetchStats() {
+      try {
+        const res = await fetch('/api/stats');
+        if (res.ok) {
+          const data = await res.json();
+          setPlatformStats(data);
+        }
+      } catch {
+        // silent fail
+      }
+    }
+    fetchStats();
+  }, []);
+
   // ─── Helpers ───────────────────────────────────────────
   const name = (item: { nameAr: string; nameEn: string }) =>
     locale === 'ar' ? item.nameAr : item.nameEn;
@@ -351,19 +388,19 @@ export default function HomePage() {
     },
     {
       icon: <Users className="w-6 h-6" />,
-      value: 500,
-      suffix: '+',
-      label: locale === 'ar' ? 'مقدم رعاية صحية' : 'Healthcare Providers',
+      value: platformStats?.totalProviders ?? 0,
+      suffix: '',
+      label: locale === 'ar' ? 'مزود خدمة' : 'Healthcare Providers',
     },
     {
       icon: <Heart className="w-6 h-6" />,
-      value: 10000,
-      suffix: '+',
-      label: locale === 'ar' ? 'مريض سعيد' : 'Happy Patients',
+      value: platformStats?.totalBookings ?? 0,
+      suffix: '',
+      label: locale === 'ar' ? 'حجز مكتمل' : 'Total Bookings',
     },
     {
       icon: <Star className="w-6 h-6" />,
-      value: 4.9,
+      value: platformStats?.avgRating ?? 0,
       suffix: '',
       label: locale === 'ar' ? 'متوسط التقييم' : 'Average Rating',
     },
@@ -396,35 +433,8 @@ export default function HomePage() {
     },
   ];
 
-  const testimonials = [
-    {
-      name: locale === 'ar' ? 'أمين بلقاسم' : 'Amine Belkacem',
-      text:
-        locale === 'ar'
-          ? 'تجربة رائعة في السياحة العلاجية! حجزت موعداً مع أفضل طبيب قلب في الجزائر العاصمة عبر منصة H. الخدمة كانت سلسة والنتائج ممتازة.'
-          : 'An amazing medical tourism experience! I booked an appointment with the best cardiologist in Algiers through the H platform. The service was smooth and the results were excellent.',
-      rating: 5,
-      avatar: '/images/avatar-1.png',
-    },
-    {
-      name: locale === 'ar' ? 'فاطمة الزهراء بوعلام' : 'Fatima Zohra Boualem',
-      text:
-        locale === 'ar'
-          ? 'سافرت من وهران إلى قسنطينة لعلاج أسناني. المنصة ساعدتني في إيجاد أفضل عيادة أسنان والتنسيق بين الموعد والسفر. أنصح بها بشدة!'
-          : 'I traveled from Oran to Constantine for dental treatment. The platform helped me find the best dental clinic and coordinate between the appointment and travel. Highly recommended!',
-      rating: 5,
-      avatar: '/images/avatar-2.png',
-    },
-    {
-      name: locale === 'ar' ? 'يوسف مرابط' : 'Youcef Merabet',
-      text:
-        locale === 'ar'
-          ? 'العلاج الطبيعي الذي تلقيته في بجاية كان مذهلاً. الطبيب متخصص والأسعار معقولة جداً مقارنة بالخارج. شكراً منصة H!'
-          : 'The physiotherapy I received in Béjaïa was incredible. The doctor is a specialist and the prices are very reasonable compared to abroad. Thank you H platform!',
-      rating: 5,
-      avatar: '/images/avatar-3.png',
-    },
-  ];
+  // Real reviews from the platform stats API
+  const reviews = platformStats?.recentReviews?.slice(0, 3) ?? [];
 
   const containerVariants = {
     hidden: {},
@@ -927,52 +937,94 @@ export default function HomePage() {
           </motion.div>
 
           {/* Testimonial Cards */}
-          <motion.div
-            variants={containerVariants}
-            initial="hidden"
-            whileInView="show"
-            viewport={{ once: true, margin: '-50px' }}
-            className="grid grid-cols-1 md:grid-cols-3 gap-6"
-          >
-            {testimonials.map((item, idx) => (
-              <motion.div
-                key={idx}
-                variants={itemVariants}
-                className="testimonial-card glass rounded-2xl p-6 sm:p-8 border border-purple-500/10 hover:border-purple-500/25 transition-all duration-300"
-              >
-                {/* Large Quote Icon */}
-                <Quote className="w-10 h-10 text-purple-500/30 mb-5" />
-
-                {/* Text */}
-                <p className="text-sm text-muted-foreground leading-relaxed mb-6">
-                  {item.text}
-                </p>
-
-                {/* Author */}
-                <div className="flex items-center gap-3 pt-5 border-t border-purple-500/10">
-                  {/* Avatar */}
-                  <div className="w-11 h-11 rounded-full bg-gradient-to-br from-purple-600 to-purple-800 flex items-center justify-center text-white font-bold text-sm shrink-0">
-                    {item.name.charAt(0)}
+          {!platformStats ? (
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+              {[1, 2, 3].map((i) => (
+                <div key={i} className="glass rounded-2xl p-6 sm:p-8 border border-purple-500/10 animate-pulse">
+                  <div className="w-10 h-10 bg-purple-500/10 rounded-lg mb-5" />
+                  <div className="space-y-2 mb-6">
+                    <div className="h-3 bg-purple-500/10 rounded w-full" />
+                    <div className="h-3 bg-purple-500/10 rounded w-4/5" />
+                    <div className="h-3 bg-purple-500/10 rounded w-3/5" />
                   </div>
-                  <div className="flex-1 min-w-0">
-                    <p className="text-sm font-semibold text-foreground truncate">
-                      {item.name}
-                    </p>
-                    <div className="flex gap-0.5 mt-1">
-                      {Array.from({ length: 5 }).map((_, i) => (
-                        <Star
-                          key={i}
-                          className={`w-3.5 h-3.5 ${
-                            i < item.rating ? 'star-filled fill-current' : 'text-gray-600'
-                          }`}
-                        />
-                      ))}
+                  <div className="flex items-center gap-3 pt-5 border-t border-purple-500/10">
+                    <div className="w-11 h-11 rounded-full bg-purple-500/10" />
+                    <div className="flex-1 space-y-2">
+                      <div className="h-3 bg-purple-500/10 rounded w-24" />
+                      <div className="h-3 bg-purple-500/10 rounded w-16" />
                     </div>
                   </div>
                 </div>
-              </motion.div>
-            ))}
-          </motion.div>
+              ))}
+            </div>
+          ) : reviews.length === 0 ? (
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              whileInView={{ opacity: 1, y: 0 }}
+              viewport={{ once: true }}
+              className="glass rounded-2xl p-10 text-center border border-purple-500/10"
+            >
+              <Quote className="w-12 h-12 text-purple-500/20 mx-auto mb-4" />
+              <p className="text-muted-foreground text-sm">
+                {locale === 'ar' ? 'لا توجد تقييمات بعد' : 'No reviews yet'}
+              </p>
+            </motion.div>
+          ) : (
+            <motion.div
+              variants={containerVariants}
+              initial="hidden"
+              whileInView="show"
+              viewport={{ once: true, margin: '-50px' }}
+              className="grid grid-cols-1 md:grid-cols-3 gap-6"
+            >
+              {reviews.map((review, idx) => (
+                <motion.div
+                  key={review.id}
+                  variants={itemVariants}
+                  className="testimonial-card glass rounded-2xl p-6 sm:p-8 border border-purple-500/10 hover:border-purple-500/25 transition-all duration-300"
+                >
+                  {/* Large Quote Icon */}
+                  <Quote className="w-10 h-10 text-purple-500/30 mb-5" />
+
+                  {/* Review Text */}
+                  <p className="text-sm text-muted-foreground leading-relaxed mb-4">
+                    {review.comment}
+                  </p>
+
+                  {/* Service Name */}
+                  {review.service && (
+                    <p className="text-xs text-purple-400/70 mb-6 flex items-center gap-1.5">
+                      <Stethoscope className="w-3.5 h-3.5" />
+                      {locale === 'ar' ? review.service.titleAr : review.service.titleEn}
+                    </p>
+                  )}
+
+                  {/* Author */}
+                  <div className="flex items-center gap-3 pt-5 border-t border-purple-500/10">
+                    {/* Avatar — Name initial in colored circle */}
+                    <div className="w-11 h-11 rounded-full bg-gradient-to-br from-purple-600 to-purple-800 flex items-center justify-center text-white font-bold text-sm shrink-0">
+                      {(review.user?.name || '?').charAt(0).toUpperCase()}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-foreground truncate">
+                        {review.user?.name || (locale === 'ar' ? 'مستخدم' : 'User')}
+                      </p>
+                      <div className="flex gap-0.5 mt-1">
+                        {Array.from({ length: 5 }).map((_, i) => (
+                          <Star
+                            key={i}
+                            className={`w-3.5 h-3.5 ${
+                              i < review.rating ? 'star-filled fill-current' : 'text-gray-600'
+                            }`}
+                          />
+                        ))}
+                      </div>
+                    </div>
+                  </div>
+                </motion.div>
+              ))}
+            </motion.div>
+          )}
         </div>
       </section>
     </div>
