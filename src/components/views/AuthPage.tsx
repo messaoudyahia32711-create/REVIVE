@@ -177,7 +177,7 @@ export default function AuthPage() {
             : (locale === 'ar' ? 'تم إنشاء الحساب بنجاح!' : 'Account created successfully!'),
           'success'
         );
-        navigateTo(userData.role === 'provider' ? 'provider-dashboard' : 'home');
+        navigateTo(userData.role === 'admin' ? 'admin-dashboard' : userData.role === 'provider' ? 'provider-dashboard' : 'user-dashboard');
       } else {
         setError(data.error || t('error'));
         setShakeKey((k) => k + 1);

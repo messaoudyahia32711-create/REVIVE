@@ -149,6 +149,7 @@ export default function Header() {
   );
 
   const getDashboardPage = useCallback((): Page => {
+    if (user?.role === 'admin') return 'admin-dashboard';
     if (user?.role === 'provider') return 'provider-dashboard';
     return 'user-dashboard';
   }, [user?.role]);

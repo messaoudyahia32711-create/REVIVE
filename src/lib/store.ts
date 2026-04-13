@@ -18,7 +18,7 @@ interface UserState {
   id: string;
   email: string;
   name: string;
-  role: 'user' | 'provider';
+  role: 'user' | 'provider' | 'admin';
   avatar?: string;
   phone?: string;
   locale: Locale;
