@@ -39,7 +39,7 @@ interface ServiceDetail {
     description: string | null;
     rating: number;
     verified: boolean;
-    location: string | null;
+    wilaya?: string | null;
     user: { name: string; phone: string | null; avatar: string | null };
   };
   category: { id: string; nameAr: string; nameEn: string; icon: string };

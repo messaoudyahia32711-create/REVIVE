@@ -185,3 +185,23 @@ Stage Summary:
 - Admin dashboard with platform management capabilities
 - All glow/hover/ornament effects applied consistently
 - Zero lint errors, all APIs functional, dev server compiling
+---
+Task ID: fix-detail-navigation
+Agent: main-coordinator
+Task: Fix "View Details" button not navigating to service detail page
+
+Work Log:
+- Investigated dev server logs and found root cause: API returning 500 error
+- Error: `The column main.Provider.location does not exist in the current database`
+- Root cause: Prisma client was compiled from old schema that had `Provider.location`, but schema was updated to use `Provider.wilaya` without regenerating client
+- Ran `bunx prisma generate` to regenerate Prisma client matching current schema
+- Ran `bun run db:push` to verify database schema sync (already in sync)
+- Updated `ServiceDetailPage.tsx` interface: changed `provider.location: string | null` to `provider.wilaya?: string | null`
+- Cleared `.next` cache and restarted dev server
+- Verified fix: Prisma queries no longer include `Provider.location`, only select `id, companyName, rating, verified`
+- Confirmed API routes returning 200 (no more 500 errors)
+
+Stage Summary:
+- Fixed: "View Details" navigation now works - API no longer crashes with missing column error
+- Prisma client regenerated to match current schema (Provider has wilaya, not location)
+- ServiceDetailPage TypeScript interface updated to match actual data shape
