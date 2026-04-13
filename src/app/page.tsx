@@ -27,7 +27,9 @@ export default function Home() {
     document.documentElement.dir = isRTL ? 'rtl' : 'ltr';
   }, [locale, isRTL]);
 
-  const showFooter = !['user-dashboard', 'provider-dashboard', 'admin-dashboard'].includes(currentPage);
+  const isDashboardPage = ['user-dashboard', 'provider-dashboard', 'admin-dashboard', 'profile'].includes(currentPage);
+  const showFooter = !isDashboardPage;
+  const showHeader = !isDashboardPage;
 
   const renderPage = () => {
     switch (currentPage) {
@@ -44,7 +46,7 @@ export default function Home() {
 
   return (
     <div className="min-h-screen flex flex-col">
-      <Header />
+      {showHeader && <Header />}
       <main className="flex-1">
         <AnimatePresence mode="wait">
           <motion.div key={currentPage} variants={pageVariants} initial="initial" animate="animate" exit="exit">

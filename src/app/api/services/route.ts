@@ -14,7 +14,8 @@ export async function GET(request: NextRequest) {
     const wilaya = searchParams.get('wilaya');
 
     // Build where clause
-    const where: Prisma.ServiceWhereInput = { active: true };
+    // When providerId is specified, show ALL services (including inactive) so provider can manage them
+    const where: Prisma.ServiceWhereInput = providerId ? {} : { active: true };
 
     if (categoryId) {
       where.categoryId = categoryId;
@@ -124,7 +125,7 @@ export async function POST(request: NextRequest) {
       featured,
     } = body;
 
-    if (!providerId || !categoryId || !titleAr || !titleEn || !descriptionAr || !descriptionEn || !price || !duration || !wilaya) {
+    if (!providerId || !categoryId || !titleAr || !titleEn || !price || !duration || !wilaya) {
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }

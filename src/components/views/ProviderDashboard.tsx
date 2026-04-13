@@ -917,7 +917,7 @@ export default function ProviderDashboard() {
               </div>
             </div>
             {renderWilayaField(serviceForm.wilaya, (v) => setServiceForm({ ...serviceForm, wilaya: v }))}
-            <div className="grid grid-cols-3 gap-4">
+            <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <Label className="text-xs font-semibold text-purple-300">{locale === 'ar' ? 'الموقع' : 'Location'}</Label>
                 <Input value={serviceForm.location} onChange={(e) => setServiceForm({ ...serviceForm, location: e.target.value })} className="bg-white/5 border-purple-500/15 text-white" />
@@ -926,9 +926,41 @@ export default function ProviderDashboard() {
                 <Label className="text-xs font-semibold text-purple-300">{locale === 'ar' ? 'الأشخاص' : 'People'}</Label>
                 <Input type="number" value={serviceForm.maxPeople} onChange={(e) => setServiceForm({ ...serviceForm, maxPeople: e.target.value })} className="bg-white/5 border-purple-500/15 text-white" />
               </div>
-              <div className="space-y-1.5">
-                <Label className="text-xs font-semibold text-purple-300">{locale === 'ar' ? 'صورة' : 'Image'}</Label>
-                <Input value={serviceForm.image} onChange={(e) => setServiceForm({ ...serviceForm, image: e.target.value })} placeholder="URL" className="bg-white/5 border-purple-500/15 text-white" />
+            </div>
+            {/* Image Upload + Preview */}
+            <div className="space-y-2">
+              <Label className="text-xs font-semibold text-purple-300 flex items-center gap-1.5">
+                <ImageIcon className="w-3.5 h-3.5" /> {locale === 'ar' ? 'صورة الخدمة' : 'Service Image'}
+              </Label>
+              <div className="flex gap-4">
+                <div className="w-40 h-28 rounded-xl border-2 border-dashed border-purple-500/20 overflow-hidden bg-white/[0.02] relative group flex-shrink-0">
+                  {imagePreview || serviceForm.image ? (
+                    <img src={imagePreview || serviceForm.image} alt="Preview" className="w-full h-full object-cover" />
+                  ) : (
+                    <div className="w-full h-full flex flex-col items-center justify-center text-muted-foreground">
+                      <ImageIcon className="w-6 h-6 mb-1 opacity-30" />
+                      <p className="text-[10px]">{locale === 'ar' ? 'لا توجد صورة' : 'No image'}</p>
+                    </div>
+                  )}
+                  <button type="button" onClick={() => fileInputRef.current?.click()}
+                    className="absolute inset-0 bg-black/50 opacity-0 group-hover:opacity-100 transition-opacity flex items-center justify-center">
+                    <Upload className="w-4 h-4 text-white" />
+                  </button>
+                </div>
+                <div className="flex-1 flex flex-col gap-2">
+                  <button type="button" onClick={() => fileInputRef.current?.click()} disabled={uploadingImage}
+                    className="flex items-center justify-center gap-2 px-3 py-2 rounded-lg border border-purple-500/15 bg-purple-500/5 text-xs text-purple-300 hover:bg-purple-500/10 transition-all disabled:opacity-50">
+                    {uploadingImage ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Upload className="w-3.5 h-3.5" />}
+                    {uploadingImage ? (locale === 'ar' ? 'جارٍ الرفع...' : 'Uploading...') : (locale === 'ar' ? 'رفع صورة من الجهاز' : 'Upload from device')}
+                  </button>
+                  <div className="flex items-center gap-2 text-[10px] text-muted-foreground">
+                    <span className="flex-1 border-t border-purple-500/10" />
+                    <span>{locale === 'ar' ? 'أو رابط' : 'or URL'}</span>
+                    <span className="flex-1 border-t border-purple-500/10" />
+                  </div>
+                  <Input value={serviceForm.image} onChange={(e) => { setServiceForm({ ...serviceForm, image: e.target.value }); setImagePreview(e.target.value); }}
+                    placeholder="https://..." className="bg-white/5 border-purple-500/15 text-white text-xs h-8" />
+                </div>
               </div>
             </div>
             <div className="flex justify-end gap-2 pt-2">
