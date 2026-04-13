@@ -51,11 +51,27 @@ export async function GET() {
       db.provider.count({ where: { verified: false } }),
     ]);
 
-    const monthlyBookings = await db.$queryRaw<Array<{ month: string; bookings: number; revenue: number }>>`
-      SELECT strftime('%Y-%m', createdAt) as month, COUNT(*) as bookings, SUM(totalPrice) as revenue
-      FROM Booking WHERE createdAt >= datetime('now', '-6 months')
-      GROUP BY strftime('%Y-%m', createdAt) ORDER BY month ASC
-    `;
+    // Calculate monthly data for last 6 months using Prisma (database-agnostic)
+    const sixMonthsAgo = new Date();
+    sixMonthsAgo.setMonth(sixMonthsAgo.getMonth() - 6);
+    const recentBookingsData = await db.booking.findMany({
+      where: { createdAt: { gte: sixMonthsAgo } },
+      select: { createdAt: true, totalPrice: true },
+    });
+
+    const monthlyMap = new Map<string, { bookings: number; revenue: number }>();
+    for (const b of recentBookingsData) {
+      const d = new Date(b.createdAt);
+      const key = `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+      const entry = monthlyMap.get(key) || { bookings: 0, revenue: 0 };
+      entry.bookings += 1;
+      entry.revenue += b.totalPrice;
+      monthlyMap.set(key, entry);
+    }
+
+    const monthlyBookings = Array.from(monthlyMap.entries())
+      .sort(([a], [b]) => a.localeCompare(b))
+      .map(([month, data]) => ({ month, bookings: data.bookings, revenue: data.revenue }));
 
     const allBookings = await db.booking.findMany({
       orderBy: { createdAt: 'desc' }, take: 10,

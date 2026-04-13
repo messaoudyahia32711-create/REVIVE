@@ -5,10 +5,14 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   Star, Clock, MapPin, Users, ArrowLeft, ChevronRight, Home,
   Calendar, Crown, Shield, CheckCircle2, X, MessageSquare,
-  Send, Minus, Plus
+  Send, Minus, Plus, AlertCircle, Loader2
 } from 'lucide-react';
 import { useAppStore } from '@/lib/store';
 import { getWilayaName } from '@/lib/wilayas';
+import {
+  AlertDialog, AlertDialogAction, AlertDialogCancel, AlertDialogContent,
+  AlertDialogDescription, AlertDialogFooter, AlertDialogHeader, AlertDialogTitle,
+} from '@/components/ui/alert-dialog';
 
 /* ═══════════════════════════════════════════════════════════════════════════
    Types
@@ -84,6 +88,9 @@ export default function ServiceDetailPage() {
   const [reviews, setReviews] = useState<Review[]>([]);
   const [loading, setLoading] = useState(true);
   const [bookingLoading, setBookingLoading] = useState(false);
+  const [bookingProcessing, setBookingProcessing] = useState(false);
+  const [bookingProcessMessage, setBookingProcessMessage] = useState('');
+  const [bookingSuccess, setBookingSuccess] = useState(false);
   const [relatedServices, setRelatedServices] = useState<RelatedService[]>([]);
   const [reviewRating, setReviewRating] = useState(0);
   const [reviewComment, setReviewComment] = useState('');
@@ -172,7 +179,12 @@ export default function ServiceDetailPage() {
       return;
     }
 
+    // Show processing modal FIRST
+    setBookingProcessing(true);
+    setBookingProcessMessage(locale === 'ar' ? 'جارٍ المعالجة من قبل المزود...' : 'Processing with provider...');
+    setBookingSuccess(false);
     setBookingLoading(true);
+    
     try {
       const res = await fetch('/api/bookings', {
         method: 'POST',
@@ -186,17 +198,31 @@ export default function ServiceDetailPage() {
           notes: bookingNotes,
         }),
       });
+      
       if (res.ok) {
-        showToast(t('bookingSuccess'), 'success');
-        resetBooking();
+        // Update to success state
+        setBookingProcessMessage(locale === 'ar' ? '✅ تم إرسال الحجز بنجاح!\nقريباً سيصل تأكيد من المزود' : '✅ Booking sent successfully!\nYou will receive confirmation soon');
+        setBookingSuccess(true);
+        setBookingLoading(false);
+        
+        // Keep success message visible for 2.5 seconds, then close and reset
+        setTimeout(() => {
+          setBookingProcessing(false);
+          setBookingSuccess(false);
+          showToast(t('bookingSuccess'), 'success');
+          resetBooking();
+        }, 2500);
       } else {
+        setBookingLoading(false);
+        setBookingProcessing(false);
         const err = await res.json();
         showToast(err.error || t('error'), 'error');
       }
-    } catch {
-      showToast(t('error'), 'error');
-    } finally {
+    } catch (error) {
+      console.error('Booking error:', error);
       setBookingLoading(false);
+      setBookingProcessing(false);
+      showToast(t('error'), 'error');
     }
   };
 
@@ -869,6 +895,69 @@ export default function ServiceDetailPage() {
           </motion.section>
         )}
       </div>
+
+      {/* ═══════════════════════════════════════════════════════════════════════
+          Booking Processing Dialog
+          ═══════════════════════════════════════════════════════════════════════ */}
+      <AnimatePresence mode="wait">
+        {bookingProcessing && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 0.2 }}
+            className="fixed inset-0 bg-black/60 z-[9999] flex items-center justify-center p-4"
+            onClick={() => !bookingSuccess && setBookingProcessing(false)}
+          >
+            <motion.div
+              initial={{ scale: 0.8, opacity: 0, y: 20 }}
+              animate={{ scale: 1, opacity: 1, y: 0 }}
+              exit={{ scale: 0.8, opacity: 0, y: 20 }}
+              transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+              onClick={(e) => e.stopPropagation()}
+              className="glass rounded-3xl border-2 border-purple-500/30 p-8 w-full max-w-md shadow-2xl shadow-purple-500/20 backdrop-blur-xl"
+            >
+              <div className="text-center">
+                {!bookingSuccess ? (
+                  <>
+                    <motion.div
+                      animate={{ rotate: 360 }}
+                      transition={{ duration: 2, repeat: Infinity, ease: 'linear' }}
+                      className="w-16 h-16 rounded-full bg-gradient-to-br from-purple-500/40 to-purple-600/40 flex items-center justify-center mx-auto mb-6 border-2 border-purple-400/50 shadow-lg shadow-purple-500/30"
+                    >
+                      <Loader2 className="w-8 h-8 text-purple-300" />
+                    </motion.div>
+                    <h3 className="text-xl font-bold text-white mb-3">
+                      {locale === 'ar' ? '⏳ جارٍ المعالجة' : '⏳ Processing'}
+                    </h3>
+                    <p className="text-sm text-white/70 whitespace-pre-line leading-relaxed">
+                      {bookingProcessMessage}
+                    </p>
+                  </>
+                ) : (
+                  <>
+                    <motion.div
+                      initial={{ scale: 0, rotate: -20 }}
+                      animate={{ scale: 1, rotate: 0 }}
+                      transition={{ type: 'spring', stiffness: 400, damping: 25 }}
+                      className="w-16 h-16 rounded-full bg-gradient-to-br from-green-500/40 to-emerald-600/40 flex items-center justify-center mx-auto mb-6 border-2 border-green-400/50 shadow-lg shadow-green-500/30"
+                    >
+                      <CheckCircle2 className="w-8 h-8 text-green-300" />
+                    </motion.div>
+                    <h3 className="text-xl font-bold text-white mb-3">
+                      {locale === 'ar' ? '✅ تم بنجاح!' : '✅ Success!'}
+                    </h3>
+                    <p className="text-sm text-white/70 whitespace-pre-line leading-relaxed">
+                      {bookingProcessMessage}
+                    </p>
+                  </>
+                )}
+              </div>
+            </motion.div>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }
+

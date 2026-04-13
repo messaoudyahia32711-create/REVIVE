@@ -7,7 +7,7 @@ import {
   DollarSign, Star, Plus, Pencil, Trash2, ChevronLeft, ChevronRight,
   Send, MapPin, Users, Loader2, Award, TrendingUp, Sparkles,
   CheckCircle2, XCircle, ShieldCheck, Clock, X, Globe, Building2, Eye, ChevronDown,
-  Menu, Upload, ImageIcon, ArrowRight, ArrowLeft, Home, Bell, Search, FileText,
+  Menu, Upload, ImageIcon, ArrowRight, ArrowLeft, Home, Bell, Search, FileText, Ban,
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell,
@@ -146,6 +146,14 @@ export default function ProviderDashboard() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
+  // ── Booking Actions State ────────────────────────────────────────────────
+  const [postponeDialogOpen, setPostponeDialogOpen] = useState(false);
+  const [postponeBookingId, setPostponeBookingId] = useState<string | null>(null);
+  const [postponeDate, setPostponeDate] = useState('');
+  const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
+  const [rejectBookingId, setRejectBookingId] = useState<string | null>(null);
+  const [rejectionReason, setRejectionReason] = useState('');
+
   const providerId = user?.providerId;
 
   // ── Navigation Items ─────────────────────────────────────────────────────
@@ -249,14 +257,21 @@ export default function ProviderDashboard() {
       confirmed: locale === 'ar' ? 'مؤكد' : 'Confirmed',
       completed: locale === 'ar' ? 'مكتمل' : 'Completed',
       cancelled: locale === 'ar' ? 'ملغي' : 'Cancelled',
+      postponed: locale === 'ar' ? 'مؤجل' : 'Postponed',
+      rejected: locale === 'ar' ? 'مرفوض' : 'Rejected',
     };
     return m[s] || s;
   };
 
   const filterLabel = (f: string) => {
     const m: Record<string, string> = {
-      all: locale === 'ar' ? 'الكل' : 'All', pending: statusLabel('pending'),
-      confirmed: statusLabel('confirmed'), completed: statusLabel('completed'), cancelled: statusLabel('cancelled'),
+      all: locale === 'ar' ? 'الكل' : 'All', 
+      pending: statusLabel('pending'),
+      confirmed: statusLabel('confirmed'), 
+      completed: statusLabel('completed'), 
+      cancelled: statusLabel('cancelled'),
+      postponed: statusLabel('postponed'),
+      rejected: statusLabel('rejected'),
     };
     return m[f] || f;
   };
@@ -267,6 +282,8 @@ export default function ProviderDashboard() {
       confirmed: 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20',
       completed: 'bg-purple-500/10 text-purple-400 border-purple-500/20',
       cancelled: 'bg-red-500/10 text-red-400 border-red-500/20',
+      postponed: 'bg-blue-500/10 text-blue-400 border-blue-500/20',
+      rejected: 'bg-red-600/10 text-red-500 border-red-600/20',
     };
     return m[s] || m.pending;
   };
@@ -385,6 +402,65 @@ export default function ProviderDashboard() {
       }
     } catch { showToast(locale === 'ar' ? 'خطأ' : 'Error', 'error'); }
     setUpdatingBooking(null);
+  };
+
+  // ── Postpone Booking ─────────────────────────────────────────────────────
+
+  const handlePostponeSubmit = async () => {
+    if (!postponeBookingId || !postponeDate) {
+      showToast(locale === 'ar' ? 'يرجى اختيار التاريخ' : 'Please select a date', 'error');
+      return;
+    }
+    setUpdatingBooking(postponeBookingId);
+    try {
+      const res = await fetch(`/api/bookings/${postponeBookingId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'postponed', postponedDate: postponeDate }),
+      });
+      if (res.ok) {
+        showToast(locale === 'ar' ? '✅ تم تأجيل الحجز' : '✅ Booking postponed', 'success');
+        setPostponeDialogOpen(false);
+        setPostponeBookingId(null);
+        setPostponeDate('');
+        fetchBookings();
+        fetchDashboard();
+      } else {
+        showToast(locale === 'ar' ? 'فشل التأجيل' : 'Postpone failed', 'error');
+      }
+    } catch {
+      showToast(locale === 'ar' ? 'خطأ' : 'Error', 'error');
+    } finally {
+      setUpdatingBooking(null);
+    }
+  };
+
+  // ── Reject Booking ───────────────────────────────────────────────────────
+
+  const handleRejectSubmit = async () => {
+    if (!rejectBookingId) return;
+    setUpdatingBooking(rejectBookingId);
+    try {
+      const res = await fetch(`/api/bookings/${rejectBookingId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'rejected', rejectionReason: rejectionReason.trim() || 'No reason provided' }),
+      });
+      if (res.ok) {
+        showToast(locale === 'ar' ? '✅ تم رفض الحجز' : '✅ Booking rejected', 'success');
+        setRejectDialogOpen(false);
+        setRejectBookingId(null);
+        setRejectionReason('');
+        fetchBookings();
+        fetchDashboard();
+      } else {
+        showToast(locale === 'ar' ? 'فشل الرفض' : 'Reject failed', 'error');
+      }
+    } catch {
+      showToast(locale === 'ar' ? 'خطأ' : 'Error', 'error');
+    } finally {
+      setUpdatingBooking(null);
+    }
   };
 
   // ── Messages ─────────────────────────────────────────────────────────────
@@ -683,7 +759,7 @@ export default function ProviderDashboard() {
     return (
       <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} className="space-y-6">
         {/* Welcome */}
-        <div className="flex items-center justify-between">
+        <div className="flex items-center justify-between flex-wrap gap-4">
           <div>
             <h1 className="text-2xl font-bold text-white">
               {locale === 'ar' ? 'مرحباً' : 'Welcome'}, <span className="text-gradient-purple">{user?.name?.split(' ')[0]}</span>
@@ -695,6 +771,30 @@ export default function ProviderDashboard() {
             <Plus className="w-4 h-4" /> {locale === 'ar' ? 'خدمة جديدة' : 'New Service'}
           </motion.button>
         </div>
+
+        {/* Pending Bookings Alert */}
+        {bookings.filter(b => b.status === 'pending').length > 0 && (
+          <motion.div initial={{ opacity: 0, y: -10 }} animate={{ opacity: 1, y: 0 }}
+            className="flex items-center justify-between p-4 rounded-xl bg-yellow-500/10 border border-yellow-500/20">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-yellow-500/20 flex items-center justify-center">
+                <CalendarCheck className="w-5 h-5 text-yellow-500" />
+              </div>
+              <div>
+                <p className="text-sm font-bold text-yellow-400">
+                  {locale === 'ar' ? 'لديك حجوزات بانتظار التأكيد' : 'You have pending bookings'}
+                </p>
+                <p className="text-xs text-yellow-500/70">
+                  {locale === 'ar' ? `يوجد ${bookings.filter(b => b.status === 'pending').length} حجوزات معلقة، يرجى مراجعتها.` : `There are ${bookings.filter(b => b.status === 'pending').length} pending bookings to review.`}
+                </p>
+              </div>
+            </div>
+            <button onClick={() => setActiveTab('bookings')}
+              className="px-4 py-2 rounded-lg bg-yellow-500/20 text-yellow-400 text-xs font-bold hover:bg-yellow-500/30 transition-colors">
+              {locale === 'ar' ? 'عرض الحجوزات' : 'View Bookings'}
+            </button>
+          </motion.div>
+        )}
 
         {/* Stat Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-4">
@@ -836,12 +936,17 @@ export default function ProviderDashboard() {
         <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
           {services.map((svc, idx) => (
             <motion.div key={svc.id} initial={{ opacity: 0, y: 16 }} animate={{ opacity: 1, y: 0 }} transition={{ delay: idx * 0.04 }}
-              className="rounded-xl border border-purple-500/10 bg-[#0f0f1a]/80 overflow-hidden hover:border-purple-500/20 transition-all group">
+              className={cn('rounded-xl border border-purple-500/10 bg-[#0f0f1a]/80 overflow-hidden hover:border-purple-500/20 transition-all group relative', !svc.active && 'opacity-70 grayscale')}>
+              {!svc.active && (
+                <div className="absolute top-2 start-2 z-10 px-2 py-0.5 rounded-md bg-red-500/90 text-[10px] font-bold text-white flex items-center gap-1">
+                  <Ban className="w-3 h-3" /> {locale === 'ar' ? 'غير نشطة' : 'Inactive'}
+                </div>
+              )}
               <div className="aspect-video relative overflow-hidden">
                 {svc.image ? <img src={svc.image} alt="" className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-500" /> : (
                   <div className="w-full h-full bg-purple-500/5 flex items-center justify-center"><Package className="w-8 h-8 text-purple-500/15" /></div>
                 )}
-                {svc.featured && (
+                {svc.featured && svc.active && (
                   <span className="absolute top-2 end-2 px-2 py-0.5 rounded-md bg-amber-500/90 text-[10px] font-bold text-white flex items-center gap-1">
                     <Star className="w-3 h-3" /> {locale === 'ar' ? 'مميزة' : 'Featured'}
                   </span>
@@ -994,6 +1099,72 @@ export default function ProviderDashboard() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+
+      {/* Postpone Booking Dialog */}
+      <AlertDialog open={postponeDialogOpen} onOpenChange={setPostponeDialogOpen}>
+        <AlertDialogContent className="bg-[#0f0f1a] border-purple-500/15">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-white flex items-center gap-2">
+              <Clock className="w-5 h-5 text-blue-400" />
+              {locale === 'ar' ? 'تأجيل الحجز' : 'Postpone Booking'}
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-white/40">
+              {locale === 'ar' ? 'اختر التاريخ الجديد للحجز' : 'Select a new date for the booking'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-4 py-4">
+            <div>
+              <label className="text-xs text-purple-300 mb-2 block">{locale === 'ar' ? 'التاريخ الجديد' : 'New Date'}</label>
+              <input
+                type="date"
+                value={postponeDate}
+                onChange={(e) => setPostponeDate(e.target.value)}
+                min={new Date().toISOString().split('T')[0]}
+                className="w-full bg-purple-500/5 border border-purple-500/15 rounded-xl px-4 py-2.5 text-sm text-white focus:outline-none focus:border-purple-500/40 [color-scheme:dark]"
+              />
+            </div>
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="bg-white/5 border-purple-500/15 text-white hover:bg-white/10">
+              {locale === 'ar' ? 'إلغاء' : 'Cancel'}
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={handlePostponeSubmit} disabled={!postponeDate} className="bg-blue-600 hover:bg-blue-700 text-white disabled:opacity-50">
+              {locale === 'ar' ? 'تأجيل' : 'Postpone'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+
+      {/* Reject Booking Dialog */}
+      <AlertDialog open={rejectDialogOpen} onOpenChange={setRejectDialogOpen}>
+        <AlertDialogContent className="bg-[#0f0f1a] border-purple-500/15">
+          <AlertDialogHeader>
+            <AlertDialogTitle className="text-white flex items-center gap-2">
+              <XCircle className="w-5 h-5 text-red-400" />
+              {locale === 'ar' ? 'رفض الحجز' : 'Reject Booking'}
+            </AlertDialogTitle>
+            <AlertDialogDescription className="text-white/40">
+              {locale === 'ar' ? 'أضف سبب الرفض (اختياري)' : 'Add rejection reason (optional)'}
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <div className="space-y-4 py-4">
+            <textarea
+              value={rejectionReason}
+              onChange={(e) => setRejectionReason(e.target.value)}
+              placeholder={locale === 'ar' ? 'السبب...' : 'Reason...'}
+              className="w-full bg-purple-500/5 border border-purple-500/15 rounded-xl px-4 py-2.5 text-sm text-white placeholder:text-white/30 focus:outline-none focus:border-purple-500/40 resize-none h-24"
+            />
+          </div>
+          <AlertDialogFooter>
+            <AlertDialogCancel className="bg-white/5 border-purple-500/15 text-white hover:bg-white/10">
+              {locale === 'ar' ? 'إلغاء' : 'Cancel'}
+            </AlertDialogCancel>
+            <AlertDialogAction onClick={handleRejectSubmit} className="bg-red-600 hover:bg-red-700 text-white">
+              {locale === 'ar' ? 'رفض' : 'Reject'}
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
     </motion.div>
   );
 
@@ -1008,7 +1179,7 @@ export default function ProviderDashboard() {
       </h1>
       {/* Filters */}
       <div className="flex gap-2 flex-wrap">
-        {['all', 'pending', 'confirmed', 'completed', 'cancelled'].map(f => (
+        {['all', 'pending', 'confirmed', 'completed', 'cancelled', 'postponed', 'rejected'].map(f => (
           <button key={f} onClick={() => setBookingFilter(f)}
             className={cn('px-3.5 py-1.5 rounded-lg text-xs font-medium border transition-all',
               bookingFilter === f ? 'bg-purple-600/20 border-purple-500/30 text-purple-300' : 'border-purple-500/10 text-white/40 hover:text-white/60 hover:border-purple-500/20')}>
@@ -1045,22 +1216,26 @@ export default function ProviderDashboard() {
                   </div>
                   <div className="flex items-center justify-between pt-2.5 border-t border-purple-500/10">
                     <span className="text-base font-bold text-amber-400">{b.totalPrice.toLocaleString()} <span className="text-xs text-amber-400/50">{t('dzd')}</span></span>
-                    <div className="flex gap-1.5">
+                    <div className="flex gap-1.5 flex-wrap">
                       {b.status === 'pending' && (
                         <>
                           <button onClick={() => updateBooking(b.id, 'confirmed')} disabled={updatingBooking === b.id}
-                            className="px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-[11px] text-emerald-400 hover:bg-emerald-500/20 disabled:opacity-50 flex items-center gap-1">
+                            className="px-2.5 py-1 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-[11px] text-emerald-400 hover:bg-emerald-500/20 disabled:opacity-50 flex items-center gap-1 transition-colors">
                             <CheckCircle2 className="w-3 h-3" /> {locale === 'ar' ? 'تأكيد' : 'Confirm'}
                           </button>
-                          <button onClick={() => updateBooking(b.id, 'cancelled')} disabled={updatingBooking === b.id}
-                            className="px-2.5 py-1 rounded-lg bg-red-500/5 border border-red-500/15 text-[11px] text-red-400 hover:bg-red-500/10 disabled:opacity-50">
-                            <XCircle className="w-3 h-3" />
+                          <button onClick={() => { setPostponeBookingId(b.id); setPostponeDate(''); setPostponeDialogOpen(true); }} disabled={updatingBooking === b.id}
+                            className="px-2.5 py-1 rounded-lg bg-blue-500/10 border border-blue-500/20 text-[11px] text-blue-400 hover:bg-blue-500/20 disabled:opacity-50 flex items-center gap-1 transition-colors">
+                            <Clock className="w-3 h-3" /> {locale === 'ar' ? 'تأجيل' : 'Postpone'}
+                          </button>
+                          <button onClick={() => { setRejectBookingId(b.id); setRejectionReason(''); setRejectDialogOpen(true); }} disabled={updatingBooking === b.id}
+                            className="px-2.5 py-1 rounded-lg bg-red-500/10 border border-red-500/20 text-[11px] text-red-400 hover:bg-red-500/15 disabled:opacity-50 flex items-center gap-1 transition-colors">
+                            <XCircle className="w-3 h-3" /> {locale === 'ar' ? 'رفض' : 'Reject'}
                           </button>
                         </>
                       )}
                       {b.status === 'confirmed' && (
                         <button onClick={() => updateBooking(b.id, 'completed')} disabled={updatingBooking === b.id}
-                          className="px-2.5 py-1 rounded-lg bg-purple-600/20 border border-purple-500/20 text-[11px] text-purple-300 disabled:opacity-50 flex items-center gap-1">
+                          className="px-2.5 py-1 rounded-lg bg-purple-600/20 border border-purple-500/20 text-[11px] text-purple-300 disabled:opacity-50 flex items-center gap-1 transition-colors">
                           <CheckCircle2 className="w-3 h-3" /> {locale === 'ar' ? 'إنهاء' : 'Complete'}
                         </button>
                       )}
@@ -1306,6 +1481,15 @@ export default function ProviderDashboard() {
               className="w-9 h-9 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center text-white/50 hover:text-white transition-all">
               <Menu className="w-4 h-4" />
             </button>
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => useAppStore.getState().goBack()}
+              className="w-9 h-9 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center text-white/50 hover:text-white transition-all border border-white/5"
+              title={locale === 'ar' ? 'العودة' : 'Back'}
+            >
+              {isRTL ? <ArrowRight className="w-4 h-4" /> : <ArrowLeft className="w-4 h-4" />}
+            </motion.button>
             <h2 className="text-sm font-semibold text-white hidden sm:block">
               {navItems.find(n => n.id === activeTab)?.label}
             </h2>
@@ -1321,6 +1505,16 @@ export default function ProviderDashboard() {
             </Avatar>
           </div>
         </div>
+
+        {/* Unverified Warning Banner */}
+        {provider && !provider.verified && (
+          <div className="bg-yellow-500/10 border-b border-yellow-500/20 px-6 py-2.5 flex items-center justify-center gap-2">
+            <Shield className="w-4 h-4 text-yellow-500" />
+            <p className="text-xs font-semibold text-yellow-400">
+              {locale === 'ar' ? 'حسابك غير موثق بعد. لا يمكنك استقبال الحجوزات أو نشر خدمات جديدة. يرجى التواصل مع الإدارة.' : 'Your account is pending verification. You cannot receive bookings until verified.'}
+            </p>
+          </div>
+        )}
 
         {/* Page Content */}
         <div className="flex-1 p-5 sm:p-6">

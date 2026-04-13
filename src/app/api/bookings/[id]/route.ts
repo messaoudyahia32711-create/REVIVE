@@ -9,12 +9,12 @@ export async function PATCH(
   try {
     const { id } = await params;
     const body = await request.json();
-    const { status } = body;
+    const { status, postponedDate, rejectionReason } = body;
 
-    const validStatuses = ['pending', 'confirmed', 'cancelled', 'completed'];
+    const validStatuses = ['pending', 'confirmed', 'cancelled', 'completed', 'postponed', 'rejected'];
     if (!status || !validStatuses.includes(status)) {
       return NextResponse.json(
-        { error: 'Invalid status. Must be: pending, confirmed, cancelled, or completed' },
+        { error: 'Invalid status. Must be: pending, confirmed, cancelled, completed, postponed, or rejected' },
         { status: 400 }
       );
     }
@@ -27,9 +27,38 @@ export async function PATCH(
       );
     }
 
+    // Validate status transitions
+    const invalidTransitions: Record<string, string[]> = {
+      cancelled: ['confirmed', 'completed'],
+      completed: ['confirmed', 'cancelled', 'pending'],
+      rejected: ['confirmed', 'completed'],
+    };
+    if (invalidTransitions[existing.status]?.includes(status)) {
+      return NextResponse.json(
+        { error: `Cannot change status from '${existing.status}' to '${status}'` },
+        { status: 400 }
+      );
+    }
+
+    // For postponed status, postponedDate is required
+    if (status === 'postponed' && !postponedDate) {
+      return NextResponse.json(
+        { error: 'postponedDate is required when status is "postponed"' },
+        { status: 400 }
+      );
+    }
+
+    const updateData: Record<string, any> = { status };
+    if (status === 'postponed') {
+      updateData.bookingDate = new Date(postponedDate);
+    }
+    if (status === 'rejected' && rejectionReason) {
+      updateData.notes = `[REJECTED] ${rejectionReason}`;
+    }
+
     const booking = await db.booking.update({
       where: { id },
-      data: { status },
+      data: updateData,
       include: {
         service: {
           select: {
@@ -47,7 +76,7 @@ export async function PATCH(
       },
     });
 
-    return NextResponse.json({ booking });
+    return NextResponse.json({ booking, message: `Booking status updated to ${status}` });
   } catch (error) {
     console.error('Booking update error:', error);
     return NextResponse.json(

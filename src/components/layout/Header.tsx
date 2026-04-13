@@ -8,6 +8,7 @@ import {
   Facebook, Twitter, Instagram, Youtube, Send,
   Mail, Heart,
   HeartPulse, Smile, Activity, Sparkles, Eye, Leaf, Stethoscope,
+  ArrowLeft, ArrowRight,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -98,7 +99,7 @@ function ActiveDot({ active }: { active: boolean }) {
 export default function Header() {
   const {
     t, locale, setLocale, isRTL,
-    currentPage, navigateTo,
+    currentPage, navigateTo, goBack,
     user, isAuthenticated, setUser,
     setSelectedCategoryId,
   } = useAppStore();
@@ -185,8 +186,22 @@ export default function Header() {
           scrolled ? 'glass--scrolled py-2' : 'glass py-3'
         }`}
       >
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between h-16">
-          {/* ── Logo ──────────────────────────────────────────────────── */}
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 flex items-center justify-between h-16 gap-4">
+          <div className="flex items-center gap-4">
+            {/* ── Back Button ───────────────────────────────────────────── */}
+            {currentPage !== 'home' && (
+              <motion.button
+                initial={{ opacity: 0, x: -10 }}
+                animate={{ opacity: 1, x: 0 }}
+                onClick={() => goBack()}
+                className="w-8 h-8 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center text-white/50 hover:text-white transition-all border border-white/5 shadow-inner"
+                title={locale === 'ar' ? 'العودة' : 'Back'}
+              >
+                {isRTL ? <ArrowRight className="w-4 h-4" /> : <ArrowLeft className="w-4 h-4" />}
+              </motion.button>
+            )}
+
+            {/* ── Logo ──────────────────────────────────────────────────── */}
           <motion.button
             onClick={() => navigateTo('home')}
             whileHover={{ scale: 1.05 }}
@@ -205,6 +220,7 @@ export default function Header() {
               REVIVE
             </span>
           </motion.button>
+          </div>
 
           {/* ── Desktop Navigation ────────────────────────────────────── */}
           <nav className="hidden md:flex items-center gap-1">
@@ -531,7 +547,7 @@ export default function Header() {
                     else navigateTo('login');
                   }}
                   className={`text-start p-4 rounded-2xl text-base font-semibold transition-all duration-300 flex items-center gap-3 ${
-                    isActive('user-dashboard') || isActive('provider-dashboard')
+                    isActive('user-dashboard') || isActive('provider-dashboard') || isActive('admin-dashboard')
                       ? 'bg-purple-500/10 border border-purple-500/20 text-purple-300'
                       : 'text-gray-400 hover:text-purple-300 hover:bg-purple-500/5 border border-transparent'
                   }`}

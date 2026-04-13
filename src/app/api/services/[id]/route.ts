@@ -100,7 +100,7 @@ export async function PUT(
         ...(titleEn !== undefined && { titleEn }),
         ...(descriptionAr !== undefined && { descriptionAr }),
         ...(descriptionEn !== undefined && { descriptionEn }),
-        ...(price !== undefined && { price: parseFloat(price) }),
+        ...(price !== undefined && { price: typeof price === 'string' ? parseFloat(price) : Number(price) }),
         ...(duration !== undefined && { duration }),
         ...(maxPeople !== undefined && { maxPeople }),
         ...(wilaya !== undefined && { wilaya }),

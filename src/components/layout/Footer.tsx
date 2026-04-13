@@ -231,13 +231,28 @@ export default function Footer() {
 
       {/* ── Bottom Copyright Bar ───────────────────────────────────────── */}
       <div className="border-t border-purple-500/10 bg-[#0d0520]">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-5 flex flex-col sm:flex-row items-center justify-between gap-3">
-          <p className="text-xs text-purple-400/40">
-            &copy; {new Date().getFullYear()} REVIVE. {t('copyright')}
-          </p>
-          <p className="text-xs text-purple-400/25 flex items-center gap-1">
-            {isRTL ? 'صُمم بكل' : 'Crafted with'} <Heart className="w-3 h-3 text-purple-500/60" /> {isRTL ? '❤️ في الجزائر' : '❤️ in Algeria'}
-          </p>
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-5">
+          <div className="flex flex-col sm:flex-row items-center justify-between gap-3 mb-4">
+            <p className="text-xs text-purple-400/40">
+              &copy; {new Date().getFullYear()} REVIVE. {t('copyright')}
+            </p>
+            <p className="text-xs text-purple-400/25 flex items-center gap-1">
+              {isRTL ? 'صُمم بكل' : 'Crafted with'} <Heart className="w-3 h-3 text-purple-500/60" /> {isRTL ? '❤️ في الجزائر' : '❤️ in Algeria'}
+            </p>
+          </div>
+          
+          <div className="pt-4 border-t border-purple-500/5 text-center space-y-2">
+            <p className="text-sm font-bold text-gradient-gold tracking-wide italic">
+              {isRTL 
+                ? 'المنصة من تطوير يحي مسعود - طالب دكتوراه في العلوم الاقتصادية بجامعة الجزائر 3' 
+                : 'Developed by Yahia Messaoud - PhD Student in Economics at the University of Algiers 3'}
+            </p>
+            <p className="text-[10px] text-amber-500/50 uppercase tracking-[0.2em] font-medium">
+              {isRTL 
+                ? 'المنصة مخصصة لأغراض البحث العلمي فقط' 
+                : 'FOR SCIENTIFIC RESEARCH PURPOSES ONLY'}
+            </p>
+          </div>
         </div>
       </div>
     </footer>

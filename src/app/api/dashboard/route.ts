@@ -29,7 +29,10 @@ export async function GET(request: NextRequest) {
     });
 
     const totalBookings = bookings.length;
-    const totalRevenue = bookings.reduce((sum, b) => sum + b.totalPrice, 0);
+    // Only count revenue from completed bookings
+    const totalRevenue = bookings
+      .filter((b) => b.status === 'completed')
+      .reduce((sum, b) => sum + b.totalPrice, 0);
 
     // Get total active services
     const totalServices = await db.service.count({
@@ -60,7 +63,10 @@ export async function GET(request: NextRequest) {
       monthlyData.push({
         month: monthLabel,
         bookings: monthBookings.length,
-        revenue: monthBookings.reduce((sum, b) => sum + b.totalPrice, 0),
+        // Only count revenue from completed bookings per month
+        revenue: monthBookings
+          .filter((b) => b.status === 'completed')
+          .reduce((sum, b) => sum + b.totalPrice, 0),
       });
     }
 

@@ -6,7 +6,7 @@ import {
   CalendarCheck, AlertTriangle, User, LogOut, Clock, Send, X,
   CheckCircle2, XCircle, CreditCard, TrendingUp, Menu, ChevronRight,
   Users, MapPin, Shield, Mail, Save, Loader2, MessageSquare,
-  Home, Calendar, ChevronDown, MessageCirclePlus, Reply,
+  Home, Calendar, ChevronDown, MessageCirclePlus, Reply, ArrowLeft, ArrowRight,
 } from 'lucide-react';
 import { useAppStore } from '@/lib/store';
 import { getWilayaName } from '@/lib/wilayas';
@@ -334,7 +334,7 @@ export default function UserDashboard() {
 
   const navItems = [
     { id: 'bookings', icon: CalendarCheck, label: locale === 'ar' ? 'الحجوزات' : 'Bookings' },
-    { id: 'complaints', icon: AlertTriangle, label: locale === 'ar' ? 'الشكاوى' : 'Complaints' },
+    { id: 'complaints', icon: AlertTriangle, label: locale === 'ar' ? 'الشكاوى' : 'Complaints', badge: complaints.filter(c => c.status !== 'resolved' && c.status !== 'closed').length },
     { id: 'profile', icon: User, label: locale === 'ar' ? 'الملف الشخصي' : 'Profile' },
   ];
 
@@ -365,12 +365,18 @@ export default function UserDashboard() {
         gradient: 'bg-gradient-to-br from-emerald-600 to-purple-700',
         value: bookings.filter(b => b.status === 'confirmed').length, isText: false,
       },
+      {
+        label: locale === 'ar' ? 'متوقفة الدفع/معلقة' : 'Pending',
+        icon: CalendarCheck, color: 'text-yellow-400',
+        gradient: 'bg-gradient-to-br from-yellow-600 to-yellow-800',
+        value: bookings.filter(b => b.status === 'pending').length, isText: false,
+      },
     ];
 
     return (
       <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} className="space-y-5">
         {/* Stat Cards */}
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
           {stats.map((stat, idx) => {
             const Icon = stat.icon;
             return (
@@ -400,22 +406,26 @@ export default function UserDashboard() {
 
         {/* Filter Tabs */}
         <div className="flex flex-wrap gap-2">
-          {filterTabs.map((tab) => (
-            <motion.button
-              key={tab}
-              whileHover={{ scale: 1.05 }}
-              whileTap={{ scale: 0.95 }}
-              onClick={() => setActiveFilter(tab)}
-              className={cn(
-                'px-4 py-2 rounded-xl text-xs font-semibold tracking-wide transition-all duration-300 border',
-                activeFilter === tab
-                  ? 'bg-purple-600/20 text-purple-300 border-purple-500/30'
-                  : 'text-white/40 border-purple-500/10 hover:text-white/70 hover:bg-white/5'
-              )}
-            >
-              {filterLabel(tab)}
-            </motion.button>
-          ))}
+          {filterTabs.map((tab) => {
+            const count = tab === 'all' ? bookings.length : bookings.filter((b) => b.status === tab).length;
+            return (
+              <motion.button
+                key={tab}
+                whileHover={{ scale: 1.05 }}
+                whileTap={{ scale: 0.95 }}
+                onClick={() => setActiveFilter(tab)}
+                className={cn(
+                  'px-4 py-2 rounded-xl text-xs font-semibold tracking-wide transition-all duration-300 border flex items-center gap-1.5',
+                  activeFilter === tab
+                    ? 'bg-purple-600/20 text-purple-300 border-purple-500/30'
+                    : 'text-white/40 border-purple-500/10 hover:text-white/70 hover:bg-white/5'
+                )}
+              >
+                {filterLabel(tab)}
+                <span className={cn('px-1.5 py-0.5 rounded-md text-[10px]', activeFilter === tab ? 'bg-purple-500/30' : 'bg-white/10')}>{count}</span>
+              </motion.button>
+            );
+          })}
         </div>
 
         {/* Bookings List */}
@@ -999,6 +1009,7 @@ export default function UserDashboard() {
                   {isActive && <motion.div layoutId="sidebar-active" className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-full bg-gradient-to-b from-purple-400 to-purple-600" transition={{ type: 'spring', stiffness: 300, damping: 30 }} />}
                   <Icon className={cn('h-5 w-5 flex-shrink-0', isActive && 'text-purple-300')} />
                   {sidebarOpen && <span className="flex-1 text-start">{item.label}</span>}
+                  {sidebarOpen && item.badge && item.badge > 0 && <span className="text-[10px] font-bold bg-amber-500/20 text-amber-500 px-1.5 py-0.5 rounded-md">{item.badge}</span>}
                 </button>
               );
             })}
@@ -1037,6 +1048,15 @@ export default function UserDashboard() {
               className="hidden lg:flex w-9 h-9 rounded-lg bg-white/5 hover:bg-white/10 items-center justify-center text-white/50 hover:text-white transition-all">
               <Menu className="w-4 h-4" />
             </button>
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => useAppStore.getState().goBack()}
+              className="w-9 h-9 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center text-white/50 hover:text-white transition-all border border-white/5"
+              title={locale === 'ar' ? 'العودة' : 'Back'}
+            >
+              {isRTL ? <ArrowRight className="w-4 h-4" /> : <ArrowLeft className="w-4 h-4" />}
+            </motion.button>
 
             {/* Mobile hamburger */}
             <Sheet open={mobileMenuOpen} onOpenChange={setMobileMenuOpen}>

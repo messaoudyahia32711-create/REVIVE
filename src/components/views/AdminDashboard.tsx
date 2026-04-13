@@ -7,10 +7,11 @@ import {
   DollarSign, Star, Shield, TrendingUp, Menu,
   Search, CheckCircle2, XCircle, Ban, Globe, BarChart3,
   Database, HardDrive, RotateCcw, Download,
-  Info, Zap, Loader2, Home, MessageSquareWarning, Send, Reply,
+  Info, Zap, Loader2, Home, MessageSquareWarning, Send, Reply, ArrowLeft, ArrowRight,
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
+  PieChart, Pie, Cell, Legend
 } from 'recharts';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -169,7 +170,10 @@ export default function AdminDashboard() {
     setComplaintsLoading(true);
     try {
       const res = await fetch('/api/complaints');
-      if (res.ok) setComplaints(await res.json());
+      if (res.ok) {
+        const d = await res.json();
+        setComplaints(d.complaints || []);
+      }
     } catch { /* silent */ }
     setComplaintsLoading(false);
   }, []);
@@ -178,6 +182,13 @@ export default function AdminDashboard() {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- initial data fetch on mount
     fetchAdmin();
     fetchComplaints();
+
+    // Real-time polling
+    const interval = setInterval(() => {
+      fetchAdmin();
+      fetchComplaints();
+    }, 30000); // 30 seconds
+    return () => clearInterval(interval);
   }, [fetchAdmin, fetchComplaints]);
 
   // ── Provider Verify Toggle ───────────────────────────────────────────────
@@ -396,12 +407,18 @@ export default function AdminDashboard() {
     return (
       <motion.div variants={stagger} initial="hidden" animate="visible" className="space-y-8">
         {/* Header */}
-        <motion.div variants={staggerItem}>
-          <div className="flex items-center gap-3 mb-1">
-            <Shield className="h-8 w-8 text-purple-400" />
-            <div className="text-3xl font-black text-gradient-purple">{locale === 'ar' ? 'لوحة الإدارة' : 'Admin Dashboard'}</div>
+        <motion.div variants={staggerItem} className="flex items-center justify-between flex-wrap gap-4">
+          <div>
+            <div className="flex items-center gap-3 mb-1">
+              <Shield className="h-8 w-8 text-purple-400" />
+              <div className="text-3xl font-black text-gradient-purple">{locale === 'ar' ? 'لوحة الإدارة' : 'Admin Dashboard'}</div>
+              <div className="flex items-center gap-2 px-2.5 py-1 rounded-full bg-red-500/10 border border-red-500/20 text-red-500 text-xs font-bold animate-pulse">
+                <div className="w-2 h-2 rounded-full bg-red-500" />
+                Live
+              </div>
+            </div>
+            <p className="text-muted-foreground text-sm">{locale === 'ar' ? 'إدارة المنصة والمراقبة بتحديث حي' : 'Real-time platform management & monitoring'}</p>
           </div>
-          <p className="text-muted-foreground text-sm">{locale === 'ar' ? 'إدارة المنصة والمراقبة' : 'Platform management & monitoring'}</p>
         </motion.div>
 
         {/* 8 Stat Cards */}
@@ -430,36 +447,139 @@ export default function AdminDashboard() {
           })}
         </div>
 
-        {/* Revenue Chart */}
-        <motion.div variants={staggerItem}>
-          <div className="rounded-2xl p-6 border border-purple-500/10 bg-[#0f0f1a]/80">
-            <CardHeader className="p-0 pb-4">
-              <CardTitle className="text-lg font-bold flex items-center gap-2 text-white">
-                <BarChart3 className="h-5 w-5 text-purple-400" />
-                {locale === 'ar' ? 'الإيرادات الشهرية' : 'Monthly Revenue'}
-              </CardTitle>
-            </CardHeader>
-            <div className="h-72">
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={data.monthlyData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="adminPurpleGrad" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="0%" stopColor="#8B5CF6" stopOpacity={1} />
-                      <stop offset="50%" stopColor="#6D28D9" stopOpacity={0.9} />
-                      <stop offset="100%" stopColor="#4C1D95" stopOpacity={0.7} />
-                    </linearGradient>
-                  </defs>
-                  <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#888' }} axisLine={false} tickLine={false} />
-                  <YAxis tick={{ fontSize: 11, fill: '#888' }} axisLine={false} tickLine={false} />
-                  <Tooltip
-                    contentStyle={{ borderRadius: '16px', border: '1px solid rgba(139,92,246,0.2)',
-                      boxShadow: '0 8px 32px rgba(0,0,0,0.3)', backdropFilter: 'blur(16px)', background: 'rgba(10,10,15,0.95)', color: '#fff' }}
-                    formatter={(value: number) => [`${value.toLocaleString()} ${t('dzd')}`, locale === 'ar' ? 'الإيرادات' : 'Revenue']}
-                    cursor={{ fill: 'rgba(139,92,246,0.06)' }}
-                  />
-                  <Bar dataKey="revenue" fill="url(#adminPurpleGrad)" radius={[8, 8, 0, 0]} maxBarSize={48} />
-                </BarChart>
-              </ResponsiveContainer>
+        {/* Charts Row */}
+        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          {/* Revenue & Bookings Chart */}
+          <motion.div variants={staggerItem} className="lg:col-span-2">
+            <div className="rounded-2xl p-6 border border-purple-500/10 bg-[#0f0f1a]/80 h-full">
+              <CardHeader className="p-0 pb-4">
+                <CardTitle className="text-lg font-bold flex items-center justify-between text-white">
+                  <div className="flex items-center gap-2">
+                    <BarChart3 className="h-5 w-5 text-purple-400" />
+                    {locale === 'ar' ? 'الإيرادات والحجوزات الشهرية' : 'Monthly Revenue & Bookings'}
+                  </div>
+                </CardTitle>
+              </CardHeader>
+              <div className="h-72">
+                <ResponsiveContainer width="100%" height="100%">
+                  <BarChart data={data.monthlyData} margin={{ top: 10, right: 10, left: 0, bottom: 0 }}>
+                    <defs>
+                      <linearGradient id="adminPurpleGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#8B5CF6" stopOpacity={1} />
+                        <stop offset="50%" stopColor="#6D28D9" stopOpacity={0.9} />
+                        <stop offset="100%" stopColor="#4C1D95" stopOpacity={0.7} />
+                      </linearGradient>
+                      <linearGradient id="adminGoldGrad" x1="0" y1="0" x2="0" y2="1">
+                        <stop offset="0%" stopColor="#D4A853" stopOpacity={1} />
+                        <stop offset="100%" stopColor="#B48631" stopOpacity={0.7} />
+                      </linearGradient>
+                    </defs>
+                    <XAxis dataKey="month" tick={{ fontSize: 11, fill: '#888' }} axisLine={false} tickLine={false} />
+                    <YAxis yAxisId="left" orientation="left" stroke="#888" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
+                    <YAxis yAxisId="right" orientation="right" stroke="#888" tick={{ fontSize: 11 }} axisLine={false} tickLine={false} />
+                    <Tooltip
+                      contentStyle={{ borderRadius: '16px', border: '1px solid rgba(139,92,246,0.2)',
+                        boxShadow: '0 8px 32px rgba(0,0,0,0.3)', backdropFilter: 'blur(16px)', background: 'rgba(10,10,15,0.95)', color: '#fff' }}
+                      cursor={{ fill: 'rgba(139,92,246,0.06)' }}
+                    />
+                    <Legend iconType="circle" wrapperStyle={{ fontSize: '12px' }} />
+                    <Bar yAxisId="left" name={locale === 'ar' ? 'الإيرادات' : 'Revenue'} dataKey="revenue" fill="url(#adminPurpleGrad)" radius={[4, 4, 0, 0]} maxBarSize={32} />
+                    <Bar yAxisId="right" name={locale === 'ar' ? 'الحجوزات' : 'Bookings'} dataKey="bookings" fill="url(#adminGoldGrad)" radius={[4, 4, 0, 0]} maxBarSize={32} />
+                  </BarChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          </motion.div>
+
+          {/* Bookings Status Pie Chart */}
+          <motion.div variants={staggerItem}>
+            <div className="rounded-2xl p-6 border border-purple-500/10 bg-[#0f0f1a]/80 h-full flex flex-col">
+              <CardHeader className="p-0 pb-4">
+                <CardTitle className="text-lg font-bold flex items-center gap-2 text-white">
+                  <PieChart className="h-5 w-5 text-purple-400" />
+                  {locale === 'ar' ? 'حالة الحجوزات' : 'Booking Statuses'}
+                </CardTitle>
+              </CardHeader>
+              <div className="flex-1 min-h-[250px]">
+                <ResponsiveContainer width="100%" height="100%">
+                  <PieChart>
+                    <Pie
+                      data={[
+                        { name: locale === 'ar' ? 'مكتملة' : 'Completed', value: data.completedBookings, color: '#A855F7' },
+                        { name: locale === 'ar' ? 'قيد الانتظار' : 'Pending', value: data.pendingBookings, color: '#EAB308' },
+                        { name: locale === 'ar' ? 'ملغاة' : 'Cancelled', value: data.cancelledBookings, color: '#EF4444' },
+                      ]}
+                      cx="50%" cy="50%" innerRadius={60} outerRadius={80} paddingAngle={5} dataKey="value"
+                    >
+                      {[
+                        { color: '#A855F7' }, { color: '#EAB308' }, { color: '#EF4444' }
+                      ].map((entry, index) => (
+                        <Cell key={`cell-${index}`} fill={entry.color} />
+                      ))}
+                    </Pie>
+                    <Tooltip contentStyle={{ borderRadius: '12px', border: 'none', background: 'rgba(10,10,15,0.95)', color: '#fff' }} />
+                    <Legend />
+                  </PieChart>
+                </ResponsiveContainer>
+              </div>
+            </div>
+          </motion.div>
+        </div>
+
+        {/* Recent Services Table */}
+        <motion.div variants={staggerItem} className="mb-6">
+          <div className="rounded-2xl border border-purple-500/10 bg-[#0f0f1a]/80 overflow-hidden">
+            <div className="px-5 py-4 border-b border-purple-500/10">
+              <h3 className="font-bold text-sm text-white flex items-center gap-2">
+                <Settings className="h-4 w-4 text-purple-400" />
+                {locale === 'ar' ? 'أحدث الخدمات المضافة' : 'Recently Added Services'}
+              </h3>
+            </div>
+            <div className="overflow-x-auto max-h-96 overflow-y-auto">
+              <table className="w-full text-sm">
+                <thead className="sticky top-0 z-10">
+                  <tr className="bg-[#0a0a0f]">
+                    <th className="text-start px-4 py-2.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{locale === 'ar' ? 'الخدمة' : 'Service'}</th>
+                    <th className="text-start px-4 py-2.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{locale === 'ar' ? 'المزود' : 'Provider'}</th>
+                    <th className="text-start px-4 py-2.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{locale === 'ar' ? 'السعر' : 'Price'}</th>
+                    <th className="text-start px-4 py-2.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{locale === 'ar' ? 'التقييم' : 'Rating'}</th>
+                    <th className="text-start px-4 py-2.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{locale === 'ar' ? 'الحالة' : 'Status'}</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {data.recentServices.length === 0 ? (
+                    <tr><td colSpan={5} className="px-4 py-8 text-center text-muted-foreground text-xs">{t('noData')}</td></tr>
+                  ) : data.recentServices.map(s => (
+                    <tr key={s.id} className="border-t border-purple-500/5 hover:bg-purple-500/5 transition-colors">
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-3">
+                          <div className="w-10 h-10 rounded-lg overflow-hidden flex-shrink-0 bg-purple-500/10">
+                            {s.image ? <img src={s.image} alt="" className="w-full h-full object-cover" /> : null}
+                          </div>
+                          <div>
+                            <p className="text-white/90 text-sm font-semibold truncate max-w-[200px]">{gt(s.titleAr, s.titleEn)}</p>
+                            <p className="text-xs text-muted-foreground truncate max-w-[200px]">{gt(s.category.nameAr, s.category.nameEn)}</p>
+                          </div>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3 text-white/80 text-xs truncate max-w-[150px]">{s.provider.companyName}</td>
+                      <td className="px-4 py-3 text-xs font-bold text-gradient-gold">{s.price.toLocaleString()} {t('dzd')}</td>
+                      <td className="px-4 py-3">
+                        <div className="flex items-center gap-1">
+                          <Star className="w-3.5 h-3.5 text-amber-400 fill-current" />
+                          <span className="text-xs text-white/80">{s.rating}</span>
+                        </div>
+                      </td>
+                      <td className="px-4 py-3">
+                        <span className={cn('px-2 py-0.5 rounded-md text-[10px] font-bold border',
+                          s.active ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20' : 'bg-red-500/10 text-red-400 border-red-500/20')}>
+                          {s.active ? (locale === 'ar' ? 'نشط' : 'Active') : (locale === 'ar' ? 'غير نشط' : 'Inactive')}
+                        </span>
+                      </td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
             </div>
           </div>
         </motion.div>
@@ -1317,6 +1437,17 @@ export default function AdminDashboard() {
                 {renderSidebarContent()}
               </SheetContent>
             </Sheet>
+            {/* Back button */}
+            <motion.button
+              whileHover={{ scale: 1.05 }}
+              whileTap={{ scale: 0.95 }}
+              onClick={() => useAppStore.getState().goBack()}
+              className="w-9 h-9 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center text-white/50 hover:text-white transition-all border border-white/5"
+              title={locale === 'ar' ? 'العودة' : 'Back'}
+            >
+              {isRTL ? <ArrowRight className="w-4 h-4" /> : <ArrowLeft className="w-4 h-4" />}
+            </motion.button>
+
             {/* Desktop toggle */}
             <button onClick={() => setSidebarOpen(!sidebarOpen)}
               className="hidden lg:flex w-9 h-9 rounded-lg bg-white/5 hover:bg-white/10 items-center justify-center text-white/50 hover:text-white transition-all">

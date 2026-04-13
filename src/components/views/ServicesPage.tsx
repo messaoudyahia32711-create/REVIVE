@@ -129,9 +129,17 @@ export default function ServicesPage() {
   const [showWilayaDropdown, setShowWilayaDropdown] = useState(false);
   const [wilayaSearch, setWilayaSearch] = useState('');
   const [searchInput, setSearchInput] = useState(searchQuery);
+
+  // Pagination State
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [totalCount, setTotalCount] = useState(0);
+  const ITEMS_PER_PAGE = 12;
+
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sortRef = useRef<HTMLDivElement>(null);
   const wilayaDropdownRef = useRef<HTMLDivElement>(null);
+  const topRef = useRef<HTMLDivElement>(null);
 
   /* ── Close dropdowns on outside click ───────────────────────────────── */
   useEffect(() => {
@@ -147,7 +155,7 @@ export default function ServicesPage() {
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  /* ── Fetch services with wilaya filter ──────────────────────────────── */
+  /* ── Fetch services with wilaya filter and pagination ────────────────── */
   const fetchServices = useCallback(async () => {
     setLoading(true);
     try {
@@ -157,17 +165,24 @@ export default function ServicesPage() {
       if (selectedWilaya) params.set('wilaya', selectedWilaya);
       if (minRating > 0) params.set('minRating', String(minRating));
       if (sortBy) params.set('sort', sortBy);
+      params.set('page', String(page));
+      params.set('limit', String(ITEMS_PER_PAGE));
+
       const res = await fetch(`/api/services?${params.toString()}`);
       if (res.ok) {
         const data = await res.json();
         setServices(data.services);
+        setTotalPages(data.totalPages || 1);
+        setTotalCount(data.totalCount || 0);
       }
     } catch {
       setServices([]);
+      setTotalPages(1);
+      setTotalCount(0);
     } finally {
       setLoading(false);
     }
-  }, [selectedCategoryId, searchQuery, selectedWilaya, minRating, sortBy]);
+  }, [selectedCategoryId, searchQuery, selectedWilaya, minRating, sortBy, page]);
 
   useEffect(() => { fetchServices(); }, [fetchServices]);
 
@@ -208,6 +223,7 @@ export default function ServicesPage() {
     setSortBy('newest');
     setWilayaSearch('');
     setMinRating(0);
+    setPage(1);
   };
 
   const serviceName = (s: Service) => locale === 'ar' ? s.titleAr : s.titleEn;
@@ -226,12 +242,25 @@ export default function ServicesPage() {
     ? getWilayaName(selectedWilaya, locale)
     : null;
 
+  /* ── Pagination handler ─────────────────────────────────────────────── */
+  const handlePageChange = (newPage: number) => {
+    if (newPage >= 1 && newPage <= totalPages) {
+      setPage(newPage);
+      topRef.current?.scrollIntoView({ behavior: 'smooth', block: 'start' });
+    }
+  };
+
+  /* ── Reset page on filter change ──────────────────────────────────────── */
+  useEffect(() => {
+    setPage(1);
+  }, [selectedCategoryId, searchQuery, selectedWilaya, minRating, sortBy]);
+
   /* ═══════════════════════════════════════════════════════════════════════
      Render
      ═══════════════════════════════════════════════════════════════════════ */
   return (
     <div className="min-h-screen pt-24 pb-16">
-      <div className="max-w-7xl mx-auto px-4 sm:px-6">
+      <div className="max-w-7xl mx-auto px-4 sm:px-6" ref={topRef}>
         {/* ═══ Breadcrumb ═══ */}
         <motion.nav
           initial={{ opacity: 0, y: -10 }}
@@ -602,16 +631,22 @@ export default function ServicesPage() {
           </div>
         </motion.div>
 
-        {/* ═══ Results Count + Clear ═══ */}
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.2 }}
           className="flex items-center justify-between mb-6"
         >
-          <p className="text-xs text-muted-foreground">
-            {services.length} {locale === 'ar' ? 'خدمة طبية متاحة' : 'medical services available'}
-          </p>
+          <div className="flex flex-col gap-1">
+            <p className="text-xs text-muted-foreground">
+              {totalCount} {locale === 'ar' ? 'خدمة طبية متاحة' : 'medical services available'}
+            </p>
+            {!loading && totalCount > 0 && (
+              <p className="text-[10px] border text-purple-400 bg-purple-500/10 border-purple-500/20 px-2 py-0.5 rounded-md w-fit">
+                {locale === 'ar' ? `عرض ${Math.min((page - 1) * ITEMS_PER_PAGE + 1, totalCount)} - ${Math.min(page * ITEMS_PER_PAGE, totalCount)}` : `Showing ${Math.min((page - 1) * ITEMS_PER_PAGE + 1, totalCount)} - ${Math.min(page * ITEMS_PER_PAGE, totalCount)}`}
+              </p>
+            )}
+          </div>
           {isFiltered && (
             <button
               onClick={clearFilters}
@@ -820,6 +855,59 @@ export default function ServicesPage() {
                 </div>
               </motion.div>
             ))}
+          </motion.div>
+        )}
+
+        {/* ═══ Pagination ═══ */}
+        {!loading && totalPages > 1 && (
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            className="mt-12 flex justify-center"
+          >
+            <div className="flex items-center gap-2 bg-[#0f0f1a]/80 border border-purple-500/20 p-2 rounded-2xl">
+              <button
+                onClick={() => handlePageChange(page - 1)}
+                disabled={page === 1}
+                className="w-10 h-10 rounded-xl flex items-center justify-center text-white/70 hover:bg-white/5 hover:text-white disabled:opacity-30 disabled:pointer-events-none transition-colors"
+                aria-label="Previous Page"
+              >
+                <ChevronRight className={`w-5 h-5 ${!isRTL ? 'rotate-180' : ''}`} />
+              </button>
+
+              <div className="flex items-center gap-1">
+                {Array.from({ length: totalPages }, (_, i) => i + 1).map((p) => {
+                  // Show max 5 page numbers: first, last, current, and adjacent
+                  if (totalPages > 5 && p !== 1 && p !== totalPages && Math.abs(p - page) > 1) {
+                    if (p === 2 && page > 3) return <span key={p} className="text-white/30 px-1">...</span>;
+                    if (p === totalPages - 1 && page < totalPages - 2) return <span key={p} className="text-white/30 px-1">...</span>;
+                    return null;
+                  }
+                  return (
+                    <button
+                      key={p}
+                      onClick={() => handlePageChange(p)}
+                      className={`w-10 h-10 rounded-xl text-sm font-bold transition-all ${
+                        p === page
+                          ? 'bg-gradient-to-br from-purple-600 to-purple-800 text-white shadow-lg shadow-purple-500/20'
+                          : 'text-white/70 hover:bg-white/5 hover:text-white'
+                      }`}
+                    >
+                      {p}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <button
+                onClick={() => handlePageChange(page + 1)}
+                disabled={page === totalPages}
+                className="w-10 h-10 rounded-xl flex items-center justify-center text-white/70 hover:bg-white/5 hover:text-white disabled:opacity-30 disabled:pointer-events-none transition-colors"
+                aria-label="Next Page"
+              >
+                <ChevronRight className={`w-5 h-5 ${isRTL ? 'rotate-180' : ''}`} />
+              </button>
+            </div>
           </motion.div>
         )}
       </div>

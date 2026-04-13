@@ -8,7 +8,7 @@ export async function POST(request: NextRequest) {
     const { action, email, password, name, phone, role, companyName, description, location } = body;
 
     // Login
-    if (action === 'login' || (!action && email && password && !name)) {
+    if (action === 'login') {
       if (!email || !password) {
         return NextResponse.json(
           { error: 'Email and password are required' },
@@ -46,10 +46,27 @@ export async function POST(request: NextRequest) {
     }
 
     // Register
-    if (action === 'register' || (!action && name)) {
+    if (action === 'register') {
       if (!email || !password || !name) {
         return NextResponse.json(
           { error: 'Email, password, and name are required' },
+          { status: 400 }
+        );
+      }
+
+      // Basic email format check
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(email)) {
+        return NextResponse.json(
+          { error: 'Invalid email format' },
+          { status: 400 }
+        );
+      }
+
+      // Minimum password length
+      if (password.length < 6) {
+        return NextResponse.json(
+          { error: 'Password must be at least 6 characters' },
           { status: 400 }
         );
       }
@@ -126,7 +143,7 @@ export async function PATCH(request: NextRequest) {
     // Build update data (only include fields that are provided)
     const updateData: Record<string, string> = {};
     if (name !== undefined) updateData.name = name;
-    if (phone !== undefined) updateData.phone = phone || null;
+    if (phone !== undefined) updateData.phone = phone?.trim() || null;
 
     if (Object.keys(updateData).length === 0) {
       return NextResponse.json(

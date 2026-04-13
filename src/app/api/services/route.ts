@@ -40,12 +40,12 @@ export async function GET(request: NextRequest) {
 
     if (search) {
       where.OR = [
-        { titleAr: { contains: search } },
-        { titleEn: { contains: search } },
-        { descriptionAr: { contains: search } },
-        { descriptionEn: { contains: search } },
-        { location: { contains: search } },
-        { wilaya: { contains: search } },
+        { titleAr: { contains: search, mode: 'insensitive' as const } },
+        { titleEn: { contains: search, mode: 'insensitive' as const } },
+        { descriptionAr: { contains: search, mode: 'insensitive' as const } },
+        { descriptionEn: { contains: search, mode: 'insensitive' as const } },
+        { location: { contains: search, mode: 'insensitive' as const } },
+        { wilaya: { contains: search, mode: 'insensitive' as const } },
       ];
     }
 
@@ -56,9 +56,18 @@ export async function GET(request: NextRequest) {
     else if (sort === 'rating') orderBy = { rating: 'desc' };
     else if (sort === 'newest') orderBy = { createdAt: 'desc' };
 
+    // Pagination
+    const page = parseInt(searchParams.get('page') || '0');
+    const limit = parseInt(searchParams.get('limit') || '0');
+    const isPaginated = page > 0 && limit > 0;
+
+    // Count total matching documents
+    const totalCount = await db.service.count({ where });
+
     const services = await db.service.findMany({
       where,
       orderBy,
+      ...(isPaginated && { skip: (page - 1) * limit, take: limit }),
       include: {
         provider: {
           select: { id: true, companyName: true, rating: true, verified: true },
@@ -99,7 +108,14 @@ export async function GET(request: NextRequest) {
       reviewCount: service.reviews.length,
     }));
 
-    return NextResponse.json({ services: servicesWithReviewCount });
+    return NextResponse.json({
+      services: servicesWithReviewCount,
+      totalCount,
+      ...(isPaginated && {
+        totalPages: Math.ceil(totalCount / limit),
+        currentPage: page,
+      }),
+    });
   } catch (error) {
     console.error('Services list error:', error);
     return NextResponse.json(
@@ -137,6 +153,14 @@ export async function POST(request: NextRequest) {
       );
     }
 
+    const parsedPrice = parseFloat(price);
+    if (isNaN(parsedPrice) || parsedPrice <= 0) {
+      return NextResponse.json(
+        { error: 'Price must be a positive number' },
+        { status: 400 }
+      );
+    }
+
     const service = await db.service.create({
       data: {
         providerId,
@@ -145,7 +169,7 @@ export async function POST(request: NextRequest) {
         titleEn,
         descriptionAr,
         descriptionEn,
-        price: parseFloat(price),
+        price: parsedPrice,
         duration,
         maxPeople: maxPeople || 1,
         wilaya,
