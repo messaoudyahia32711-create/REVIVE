@@ -3,11 +3,11 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
-  LayoutDashboard, Users, Building2, Package, CalendarCheck, Settings,
-  DollarSign, Star, Shield, TrendingUp, Menu, ChevronLeft, ChevronRight,
-  Search, XCircle, CheckCircle2, Eye, Ban, Award, MessageSquare,
-  StarOff, Globe, BarChart3, Database, HardDrive, RotateCcw, Download,
-  Info, Zap, Loader2,
+  LayoutDashboard, Users, Building2, CalendarCheck, Settings,
+  DollarSign, Star, Shield, TrendingUp, Menu,
+  Search, CheckCircle2, XCircle, Ban, Globe, BarChart3,
+  Database, HardDrive, RotateCcw, Download,
+  Info, Zap, Loader2, Home, MessageSquareWarning, Send, Reply,
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -16,27 +16,24 @@ import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
-import { Separator } from '@/components/ui/separator';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Skeleton } from '@/components/ui/skeleton';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import {
   Sheet, SheetContent, SheetTrigger, SheetTitle,
 } from '@/components/ui/sheet';
-import {
-  Select, SelectContent, SelectItem, SelectTrigger, SelectValue,
-} from '@/components/ui/select';
 import { useAppStore } from '@/lib/store';
 import { cn } from '@/lib/utils';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
-type TabId = 'overview' | 'users' | 'providers' | 'services' | 'bookings' | 'settings';
+type TabId = 'overview' | 'users' | 'providers' | 'bookings' | 'complaints' | 'settings';
 
 interface AdminData {
   totalUsers: number; totalProviders: number; totalServices: number;
   totalBookings: number; totalReviews: number; totalCategories: number;
   pendingBookings: number; completedBookings: number; cancelledBookings: number;
+  openComplaints: number; inactiveUsers: number; unverifiedProviders: number;
   totalRevenue: number;
   monthlyData: { month: string; bookings: number; revenue: number }[];
   recentBookings: AdminBooking[];
@@ -54,14 +51,14 @@ interface AdminBooking {
 }
 
 interface AdminUser {
-  id: string; name: string; email: string; role: string; createdAt: string;
+  id: string; name: string; email: string; role: string; active: boolean; createdAt: string;
 }
 
 interface AdminProvider {
   id: string; userId: string; companyName: string; description: string | null;
   location: string | null; rating: number; totalReviews: number; verified: boolean;
   createdAt: string;
-  user: { name: string; email: string };
+  user: { name: string; email: string; active: boolean };
   _count: { services: number; bookings: number };
 }
 
@@ -72,6 +69,12 @@ interface AdminService {
   rating: number; totalReviews: number; createdAt: string;
   provider: { companyName: string } | null;
   category: { nameAr: string; nameEn: string } | null;
+}
+
+interface Complaint {
+  id: string; userId: string; subject: string; content: string;
+  status: string; adminReply: string | null; createdAt: string; updatedAt: string;
+  user: { id: string; name: string; email: string; avatar: string | null; role: string };
 }
 
 // ── Animation ──────────────────────────────────────────────────────────────
@@ -114,19 +117,42 @@ function StatusBadge({ status, label }: { status: string; label: string }) {
   return <span className={cn('px-2.5 py-0.5 rounded-lg border text-[10px] font-bold uppercase tracking-wider', cfg[status] || cfg.pending)}>{label}</span>;
 }
 
+function ComplaintStatusBadge({ status }: { status: string }) {
+  const { locale } = useAppStore();
+  const cfg: Record<string, { cls: string; label: string }> = {
+    open:       { cls: 'bg-yellow-500/10 border-yellow-500/30 text-yellow-400', label: locale === 'ar' ? 'مفتوحة' : 'Open' },
+    in_progress:{ cls: 'bg-blue-500/10 border-blue-500/30 text-blue-400', label: locale === 'ar' ? 'قيد المراجعة' : 'In Progress' },
+    resolved:   { cls: 'bg-emerald-500/10 border-emerald-500/30 text-emerald-400', label: locale === 'ar' ? 'تم الحل' : 'Resolved' },
+    closed:     { cls: 'bg-gray-500/10 border-gray-500/30 text-gray-400', label: locale === 'ar' ? 'مغلقة' : 'Closed' },
+  };
+  const c = cfg[status] || cfg.open;
+  return <span className={cn('px-2.5 py-0.5 rounded-lg border text-[10px] font-bold uppercase tracking-wider', c.cls)}>{c.label}</span>;
+}
+
+// ── Sidebar Width ──────────────────────────────────────────────────────────
+
+const SIDEBAR_WIDTH = 280;
+
 // ── Main Component ─────────────────────────────────────────────────────────
 
 export default function AdminDashboard() {
   const { t, locale, isRTL, showToast } = useAppStore();
 
   const [activeTab, setActiveTab] = useState<TabId>('overview');
-  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [sidebarOpen, setSidebarOpen] = useState(true);
+  const [mobileSheetOpen, setMobileSheetOpen] = useState(false);
   const [loading, setLoading] = useState(true);
   const [data, setData] = useState<AdminData | null>(null);
+  const [complaints, setComplaints] = useState<Complaint[]>([]);
+  const [complaintsLoading, setComplaintsLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const [bookingStatusFilter, setBookingStatusFilter] = useState('all');
+  const [complaintFilter, setComplaintFilter] = useState('all');
   const [verifying, setVerifying] = useState<string | null>(null);
-  const [deactivatedUsers, setDeactivatedUsers] = useState<Set<string>>(new Set());
+  const [togglingUser, setTogglingUser] = useState<string | null>(null);
+  const [replyingTo, setReplyingTo] = useState<string | null>(null);
+  const [replyText, setReplyText] = useState('');
+  const [sendingReply, setSendingReply] = useState<string | null>(null);
 
   // ── Fetch Admin Data ──────────────────────────────────────────────────────
 
@@ -139,10 +165,20 @@ export default function AdminDashboard() {
     setLoading(false);
   }, []);
 
+  const fetchComplaints = useCallback(async () => {
+    setComplaintsLoading(true);
+    try {
+      const res = await fetch('/api/complaints');
+      if (res.ok) setComplaints(await res.json());
+    } catch { /* silent */ }
+    setComplaintsLoading(false);
+  }, []);
+
   useEffect(() => {
     // eslint-disable-next-line react-hooks/set-state-in-effect -- initial data fetch on mount
     fetchAdmin();
-  }, [fetchAdmin]);
+    fetchComplaints();
+  }, [fetchAdmin, fetchComplaints]);
 
   // ── Provider Verify Toggle ───────────────────────────────────────────────
 
@@ -169,20 +205,29 @@ export default function AdminDashboard() {
     setVerifying(null);
   };
 
-  // ── User Activate/Deactivate (toast only) ─────────────────────────────────
+  // ── User Activate/Deactivate (REAL API) ──────────────────────────────────
 
-  const toggleUserActive = (userId: string, name: string) => {
-    setDeactivatedUsers(prev => {
-      const next = new Set(prev);
-      if (next.has(userId)) {
-        next.delete(userId);
-        showToast(locale === 'ar' ? `تم تفعيل ${name}` : `${name} activated`, 'success');
-      } else {
-        next.add(userId);
-        showToast(locale === 'ar' ? `تم تعطيل ${name}` : `${name} deactivated`, 'success');
+  const toggleUserActive = async (userId: string, currentActive: boolean, name: string) => {
+    setTogglingUser(userId);
+    try {
+      const res = await fetch('/api/admin', {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ action: 'toggleUserActive', userId, active: !currentActive }),
+      });
+      if (res.ok) {
+        showToast(
+          !currentActive
+            ? (locale === 'ar' ? `تم تفعيل ${name}` : `${name} activated`)
+            : (locale === 'ar' ? `تم تعطيل ${name}` : `${name} deactivated`),
+          'success',
+        );
+        fetchAdmin();
       }
-      return next;
-    });
+    } catch {
+      showToast(locale === 'ar' ? 'خطأ' : 'Error', 'error');
+    }
+    setTogglingUser(null);
   };
 
   // ── Booking Status Update ────────────────────────────────────────────────
@@ -194,6 +239,45 @@ export default function AdminDashboard() {
       });
       if (res.ok) { showToast(locale === 'ar' ? 'تم التحديث' : 'Updated', 'success'); fetchAdmin(); }
     } catch { showToast(locale === 'ar' ? 'خطأ' : 'Error', 'error'); }
+  };
+
+  // ── Complaint Reply ──────────────────────────────────────────────────────
+
+  const handleReplyComplaint = async (complaintId: string) => {
+    if (!replyText.trim()) return;
+    setSendingReply(complaintId);
+    try {
+      const res = await fetch(`/api/complaints/${complaintId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ adminReply: replyText, status: 'in_progress' }),
+      });
+      if (res.ok) {
+        showToast(locale === 'ar' ? 'تم إرسال الرد' : 'Reply sent', 'success');
+        setReplyingTo(null);
+        setReplyText('');
+        fetchComplaints();
+      }
+    } catch {
+      showToast(locale === 'ar' ? 'خطأ' : 'Error', 'error');
+    }
+    setSendingReply(null);
+  };
+
+  const handleResolveComplaint = async (complaintId: string) => {
+    try {
+      const res = await fetch(`/api/complaints/${complaintId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ status: 'resolved' }),
+      });
+      if (res.ok) {
+        showToast(locale === 'ar' ? 'تم حل الشكوى' : 'Complaint resolved', 'success');
+        fetchComplaints();
+      }
+    } catch {
+      showToast(locale === 'ar' ? 'خطأ' : 'Error', 'error');
+    }
   };
 
   // ── Helpers ──────────────────────────────────────────────────────────────
@@ -209,73 +293,60 @@ export default function AdminDashboard() {
 
   // ── Nav Items ────────────────────────────────────────────────────────────
 
-  const navItems: { id: TabId; icon: React.ElementType; label: string }[] = [
-    { id: 'overview',  icon: LayoutDashboard, label: locale === 'ar' ? 'نظرة عامة' : 'Overview' },
+  const navItems: { id: TabId; icon: React.ElementType; label: string; badge?: number }[] = [
+    { id: 'overview',  icon: LayoutDashboard, label: locale === 'ar' ? 'الإحصائيات' : 'Overview' },
     { id: 'users',     icon: Users,           label: locale === 'ar' ? 'المستخدمون' : 'Users' },
     { id: 'providers', icon: Building2,       label: locale === 'ar' ? 'المزودون' : 'Providers' },
-    { id: 'services',  icon: Package,         label: locale === 'ar' ? 'الخدمات' : 'Services' },
-    { id: 'bookings',  icon: CalendarCheck,   label: locale === 'ar' ? 'الحجوزات' : 'Bookings' },
+    { id: 'bookings',  icon: CalendarCheck,   label: locale === 'ar' ? 'الحجوزات' : 'Bookings', badge: data?.pendingBookings },
+    { id: 'complaints',icon: MessageSquareWarning, label: locale === 'ar' ? 'الشكاوى' : 'Complaints', badge: data?.openComplaints },
     { id: 'settings',  icon: Settings,        label: locale === 'ar' ? 'الإعدادات' : 'Settings' },
   ];
 
-  // ── Sidebar Content ──────────────────────────────────────────────────────
+  // ── Sidebar Content (shared between desktop and mobile sheet) ────────────
 
   const renderSidebarContent = () => (
     <div className="flex flex-col h-full">
-      {/* REVIVE Logo + Admin */}
-      <div className="p-6 pb-4 flex flex-col items-center">
-        <motion.div initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }}
-          transition={{ type: 'spring', stiffness: 200, damping: 15 }} className="relative">
-          <img src="/images/logo.png" alt="REVIVE" className="w-14 h-14 rounded-xl" />
-          <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-8 h-0.5 bg-gradient-to-r from-transparent via-gold to-transparent" />
-        </motion.div>
-        <p className="text-[11px] font-bold tracking-[0.3em] text-gradient-gold uppercase mt-1.5 flex items-center gap-1">
-          <Shield className="w-3 h-3" /> Admin
-        </p>
+      {/* Logo */}
+      <div className="h-16 flex items-center gap-2.5 px-4 border-b border-purple-500/10 flex-shrink-0">
+        <img src="/images/logo.png" alt="REVIVE" className="w-9 h-9 rounded-xl" />
+        <div>
+          <p className="text-sm font-bold text-white leading-tight">{locale === 'ar' ? 'لوحة الإدارة' : 'Admin Panel'}</p>
+          <p className="text-[10px] text-purple-400/60 flex items-center gap-1">
+            <Shield className="w-2.5 h-2.5" />
+            {locale === 'ar' ? 'مسؤول النظام' : 'System Admin'}
+          </p>
+        </div>
       </div>
 
-      <Separator className="bg-purple-500/10" />
+      {/* Nav */}
+      <ScrollArea className="flex-1 py-3 px-2">
+        <nav className="space-y-1">
+          {navItems.map((item) => {
+            const Icon = item.icon;
+            const isActive = activeTab === item.id;
+            return (
+              <button key={item.id} onClick={() => { setActiveTab(item.id); setMobileSheetOpen(false); }}
+                className={cn('w-full flex items-center gap-3 rounded-xl text-sm font-medium transition-all duration-200 relative group',
+                  'px-3 py-2.5',
+                  isActive ? 'bg-purple-600/15 text-purple-300' : 'text-white/50 hover:text-white/80 hover:bg-white/5')}>
+                {isActive && <motion.div layoutId="admin-sidebar-active" className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-full bg-gradient-to-b from-purple-400 to-purple-600" transition={{ type: 'spring', stiffness: 300, damping: 30 }} />}
+                <Icon className={cn('h-5 w-5 flex-shrink-0', isActive && 'text-purple-300')} />
+                <span className="flex-1 text-start">{item.label}</span>
+                {item.badge && item.badge > 0 && (
+                  <span className="text-[10px] font-bold bg-purple-500/20 text-purple-300 px-1.5 py-0.5 rounded-md">{item.badge}</span>
+                )}
+              </button>
+            );
+          })}
+        </nav>
+      </ScrollArea>
 
-      {/* Navigation */}
-      <nav className="flex-1 px-3 space-y-1 mt-2">
-        {navItems.map((item, idx) => {
-          const Icon = item.icon;
-          const isActive = activeTab === item.id;
-          return (
-            <motion.button
-              key={item.id}
-              initial={{ opacity: 0, x: isRTL ? 20 : -20 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.1 + idx * 0.04 }}
-              onClick={() => { setActiveTab(item.id); setSidebarOpen(false); }}
-              className={cn(
-                'w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all duration-300 relative overflow-hidden',
-                isActive
-                  ? 'bg-purple-600/20 text-purple-300 shadow-lg shadow-purple-500/5'
-                  : 'text-white/60 hover:text-white hover:bg-white/8'
-              )}
-            >
-              {isActive && (
-                <motion.div
-                  layoutId="admin-sidebar-active"
-                  className={cn('absolute top-2 bottom-2 w-[3px] rounded-full bg-gradient-to-b from-purple-400 via-purple-600 to-purple-800', isRTL ? 'right-0' : 'left-0')}
-                  transition={{ type: 'spring', stiffness: 300, damping: 30 }}
-                />
-              )}
-              <Icon className={cn('h-5 w-5 flex-shrink-0', isActive && 'text-purple-300')} />
-              <span>{item.label}</span>
-            </motion.button>
-          );
-        })}
-      </nav>
-
-      <div className="p-3 border-t border-purple-500/10">
-        <button
-          onClick={() => useAppStore.getState().navigateTo('home')}
-          className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-white/60 hover:text-white hover:bg-white/8 transition-all"
-        >
-          {isRTL ? <ChevronRight className="h-5 w-5" /> : <ChevronLeft className="h-5 w-5" />}
-          <span>{t('back')}</span>
+      {/* Bottom */}
+      <div className="px-2 py-3 border-t border-purple-500/10">
+        <button onClick={() => useAppStore.getState().navigateTo('home')}
+          className="w-full flex items-center gap-3 rounded-xl text-sm font-medium text-white/40 hover:text-white/70 hover:bg-white/5 transition-all px-3 py-2.5">
+          <Home className="h-5 w-5 flex-shrink-0" />
+          <span>{locale === 'ar' ? 'العودة للموقع' : 'Back to Home'}</span>
         </button>
       </div>
     </div>
@@ -296,7 +367,7 @@ export default function AdminDashboard() {
   const EmptyState = ({ icon: Icon, title, desc }: { icon: React.ElementType; title: string; desc: string }) => (
     <motion.div initial={{ opacity: 0, scale: 0.95 }} animate={{ opacity: 1, scale: 1 }}
       className="flex flex-col items-center justify-center py-20 text-center">
-      <div className="w-20 h-20 rounded-2xl glass flex items-center justify-center mb-5">
+      <div className="w-20 h-20 rounded-2xl bg-[#0f0f1a]/80 border border-purple-500/10 flex items-center justify-center mb-5">
         <Icon className="h-10 w-10 text-muted-foreground/30" />
       </div>
       <h3 className="font-semibold text-lg mb-2 text-white">{title}</h3>
@@ -304,7 +375,9 @@ export default function AdminDashboard() {
     </motion.div>
   );
 
-  // ── Overview Tab ─────────────────────────────────────────────────────────
+  // ═══════════════════════════════════════════════════════════════════════
+  // ── OVERVIEW TAB ────────────────────────────────────────────────────────
+  // ═══════════════════════════════════════════════════════════════════════
 
   const renderOverviewTab = () => {
     if (loading || !data) return <LoadingSkeleton />;
@@ -312,11 +385,11 @@ export default function AdminDashboard() {
     const overviewStats = [
       { label: locale === 'ar' ? 'المستخدمون' : 'Users', value: data.totalUsers, icon: Users, gradient: 'bg-gradient-to-br from-purple-600 to-purple-800', isGold: false },
       { label: locale === 'ar' ? 'المزودون' : 'Providers', value: data.totalProviders, icon: Building2, gradient: 'bg-gradient-to-br from-indigo-600 to-purple-700', isGold: false },
-      { label: locale === 'ar' ? 'الخدمات' : 'Services', value: data.totalServices, icon: Package, gradient: 'bg-gradient-to-br from-emerald-600 to-emerald-800', isGold: false },
+      { label: locale === 'ar' ? 'الخدمات' : 'Services', value: data.totalServices, icon: Globe, gradient: 'bg-gradient-to-br from-emerald-600 to-emerald-800', isGold: false },
       { label: locale === 'ar' ? 'الحجوزات' : 'Bookings', value: data.totalBookings, icon: CalendarCheck, gradient: 'bg-gradient-to-br from-teal-500 to-teal-700', isGold: false },
-      { label: locale === 'ar' ? 'الإيرادات' : 'Revenue', value: data.totalRevenue, icon: DollarSign, gradient: 'bg-gradient-to-br from-gold-dark to-gold', isGold: true, suffix: t('dzd') },
-      { label: locale === 'ar' ? 'التقييمات' : 'Reviews', value: data.totalReviews, icon: Star, gradient: 'bg-gradient-to-br from-gold-dark to-gold-light', isGold: true },
-      { label: locale === 'ar' ? 'التصنيفات' : 'Categories', value: data.totalCategories, icon: Globe, gradient: 'bg-gradient-to-br from-pink-600 to-purple-700', isGold: false },
+      { label: locale === 'ar' ? 'الإيرادات' : 'Revenue', value: data.totalRevenue, icon: DollarSign, gradient: 'bg-gradient-to-br from-amber-700 to-amber-500', isGold: true, suffix: t('dzd') },
+      { label: locale === 'ar' ? 'التقييمات' : 'Reviews', value: data.totalReviews, icon: Star, gradient: 'bg-gradient-to-br from-amber-600 to-yellow-500', isGold: true },
+      { label: locale === 'ar' ? 'الشكاوى المفتوحة' : 'Open Complaints', value: data.openComplaints, icon: MessageSquareWarning, gradient: 'bg-gradient-to-br from-red-600 to-red-800', isGold: false },
       { label: locale === 'ar' ? 'قيد الانتظار' : 'Pending', value: data.pendingBookings, icon: TrendingUp, gradient: 'bg-gradient-to-br from-yellow-600 to-orange-700', isGold: false },
     ];
 
@@ -331,23 +404,23 @@ export default function AdminDashboard() {
           <p className="text-muted-foreground text-sm">{locale === 'ar' ? 'إدارة المنصة والمراقبة' : 'Platform management & monitoring'}</p>
         </motion.div>
 
-        {/* 8 Stat Cards in 4x2 */}
+        {/* 8 Stat Cards */}
         <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
           {overviewStats.map((stat) => {
             const Icon = stat.icon;
             return (
               <motion.div key={stat.label} variants={staggerItem} whileHover={{ y: -4, scale: 1.02 }}
                 transition={{ type: 'spring', stiffness: 300, damping: 20 }}>
-                <div className="glass corner-ornament rounded-2xl overflow-hidden p-5 border border-purple-500/10 glow-purple card-hover">
+                <div className="rounded-2xl overflow-hidden p-5 border border-purple-500/10 bg-[#0f0f1a]/80 hover:bg-[#0f0f1a] transition-colors">
                   <div className="flex items-center justify-between">
                     <div className="space-y-2">
                       <p className="text-[10px] font-semibold text-muted-foreground uppercase tracking-widest">{stat.label}</p>
                       <p className={cn('text-2xl font-extrabold tracking-tight', stat.isGold && 'text-gradient-gold')}>
                         <AnimatedCounter target={stat.value as number} />
-                        {stat.suffix && <span className="text-sm font-semibold ms-1 text-gold-dark">{stat.suffix}</span>}
+                        {stat.suffix && <span className="text-sm font-semibold ms-1 text-amber-500/70">{stat.suffix}</span>}
                       </p>
                     </div>
-                    <div className={cn('w-11 h-11 rounded-xl flex items-center justify-center pulse-glow-purple', stat.gradient)}>
+                    <div className={cn('w-11 h-11 rounded-xl flex items-center justify-center', stat.gradient)}>
                       <Icon className="w-5 h-5 text-white" />
                     </div>
                   </div>
@@ -359,7 +432,7 @@ export default function AdminDashboard() {
 
         {/* Revenue Chart */}
         <motion.div variants={staggerItem}>
-          <div className="glass rounded-2xl p-6 border border-purple-500/10">
+          <div className="rounded-2xl p-6 border border-purple-500/10 bg-[#0f0f1a]/80">
             <CardHeader className="p-0 pb-4">
               <CardTitle className="text-lg font-bold flex items-center gap-2 text-white">
                 <BarChart3 className="h-5 w-5 text-purple-400" />
@@ -395,17 +468,17 @@ export default function AdminDashboard() {
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-6">
           {/* Recent Bookings Table */}
           <motion.div variants={staggerItem}>
-            <div className="glass rounded-2xl border border-purple-500/10 overflow-hidden">
+            <div className="rounded-2xl border border-purple-500/10 bg-[#0f0f1a]/80 overflow-hidden">
               <div className="px-5 py-4 border-b border-purple-500/10">
                 <h3 className="font-bold text-sm text-white flex items-center gap-2">
                   <CalendarCheck className="h-4 w-4 text-purple-400" />
                   {locale === 'ar' ? 'أحدث الحجوزات' : 'Recent Bookings'}
                 </h3>
               </div>
-              <div className="overflow-x-auto max-h-80">
+              <div className="overflow-x-auto max-h-96 overflow-y-auto">
                 <table className="w-full text-sm">
-                  <thead className="sticky top-0">
-                    <tr className="bg-purple-500/5">
+                  <thead className="sticky top-0 z-10">
+                    <tr className="bg-[#0a0a0f]">
                       <th className="text-start px-4 py-2.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{locale === 'ar' ? 'المستخدم' : 'User'}</th>
                       <th className="text-start px-4 py-2.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{locale === 'ar' ? 'الخدمة' : 'Service'}</th>
                       <th className="text-start px-4 py-2.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{locale === 'ar' ? 'الحالة' : 'Status'}</th>
@@ -431,27 +504,26 @@ export default function AdminDashboard() {
 
           {/* Recent Users Table */}
           <motion.div variants={staggerItem}>
-            <div className="glass rounded-2xl border border-purple-500/10 overflow-hidden">
+            <div className="rounded-2xl border border-purple-500/10 bg-[#0f0f1a]/80 overflow-hidden">
               <div className="px-5 py-4 border-b border-purple-500/10">
                 <h3 className="font-bold text-sm text-white flex items-center gap-2">
                   <Users className="h-4 w-4 text-purple-400" />
                   {locale === 'ar' ? 'أحدث المستخدمين' : 'Recent Users'}
                 </h3>
               </div>
-              <div className="overflow-x-auto max-h-80">
+              <div className="overflow-x-auto max-h-96 overflow-y-auto">
                 <table className="w-full text-sm">
-                  <thead className="sticky top-0">
-                    <tr className="bg-purple-500/5">
+                  <thead className="sticky top-0 z-10">
+                    <tr className="bg-[#0a0a0f]">
                       <th className="text-start px-4 py-2.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{t('name')}</th>
                       <th className="text-start px-4 py-2.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{t('email')}</th>
                       <th className="text-start px-4 py-2.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{locale === 'ar' ? 'الدور' : 'Role'}</th>
-                      <th className="text-start px-4 py-2.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{locale === 'ar' ? 'التاريخ' : 'Date'}</th>
-                      <th className="text-start px-4 py-2.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{locale === 'ar' ? 'إجراء' : 'Action'}</th>
+                      <th className="text-start px-4 py-2.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{locale === 'ar' ? 'الحالة' : 'Status'}</th>
                     </tr>
                   </thead>
                   <tbody>
                     {data.recentUsers.length === 0 ? (
-                      <tr><td colSpan={5} className="px-4 py-8 text-center text-muted-foreground text-xs">{t('noData')}</td></tr>
+                      <tr><td colSpan={4} className="px-4 py-8 text-center text-muted-foreground text-xs">{t('noData')}</td></tr>
                     ) : data.recentUsers.map(u => (
                       <tr key={u.id} className="border-t border-purple-500/5 hover:bg-purple-500/5 transition-colors">
                         <td className="px-4 py-3 text-white/80 text-xs">{u.name}</td>
@@ -462,22 +534,11 @@ export default function AdminDashboard() {
                             {u.role === 'provider' ? t('providerRole') : t('userRole')}
                           </span>
                         </td>
-                        <td className="px-4 py-3 text-muted-foreground text-xs">{new Date(u.createdAt).toLocaleDateString()}</td>
                         <td className="px-4 py-3">
-                          <motion.button
-                            whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
-                            onClick={() => toggleUserActive(u.id, u.name)}
-                            className={cn(
-                              'px-2.5 py-0.5 rounded-lg text-[10px] font-bold border flex items-center gap-1 w-fit transition-all',
-                              deactivatedUsers.has(u.id)
-                                ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20'
-                                : 'bg-red-500/10 text-red-400 border-red-500/20 hover:bg-red-500/20',
-                            )}
-                          >
-                            {deactivatedUsers.has(u.id)
-                              ? <><CheckCircle2 className="w-3 h-3" />{locale === 'ar' ? 'تفعيل' : 'Activate'}</>
-                              : <><Ban className="w-3 h-3" />{locale === 'ar' ? 'تعطيل' : 'Deactivate'}</>}
-                          </motion.button>
+                          <span className={cn('px-2 py-0.5 rounded-md text-[10px] font-bold',
+                            u.active ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20')}>
+                            {u.active ? (locale === 'ar' ? 'نشط' : 'Active') : (locale === 'ar' ? 'معطل' : 'Inactive')}
+                          </span>
                         </td>
                       </tr>
                     ))}
@@ -489,17 +550,17 @@ export default function AdminDashboard() {
 
           {/* Recent Providers Table */}
           <motion.div variants={staggerItem} className="xl:col-span-2">
-            <div className="glass rounded-2xl border border-purple-500/10 overflow-hidden">
+            <div className="rounded-2xl border border-purple-500/10 bg-[#0f0f1a]/80 overflow-hidden">
               <div className="px-5 py-4 border-b border-purple-500/10">
                 <h3 className="font-bold text-sm text-white flex items-center gap-2">
                   <Building2 className="h-4 w-4 text-purple-400" />
                   {locale === 'ar' ? 'أحدث المزودين' : 'Recent Providers'}
                 </h3>
               </div>
-              <div className="overflow-x-auto max-h-80">
+              <div className="overflow-x-auto max-h-96 overflow-y-auto">
                 <table className="w-full text-sm">
-                  <thead className="sticky top-0">
-                    <tr className="bg-purple-500/5">
+                  <thead className="sticky top-0 z-10">
+                    <tr className="bg-[#0a0a0f]">
                       <th className="text-start px-4 py-2.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{t('name')}</th>
                       <th className="text-start px-4 py-2.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{locale === 'ar' ? 'الشركة' : 'Company'}</th>
                       <th className="text-start px-4 py-2.5 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{locale === 'ar' ? 'التقييم' : 'Rating'}</th>
@@ -517,7 +578,7 @@ export default function AdminDashboard() {
                         <td className="px-4 py-3 text-white/80 text-xs">{p.user.name}</td>
                         <td className="px-4 py-3 text-white/80 text-xs">{p.companyName}</td>
                         <td className="px-4 py-3">
-                          <div className="flex items-center gap-1 text-gold star-filled">
+                          <div className="flex items-center gap-1 text-amber-400">
                             <Star className="w-3 h-3 fill-current" />
                             <span className="text-xs font-bold">{p.rating.toFixed(1)}</span>
                           </div>
@@ -564,7 +625,9 @@ export default function AdminDashboard() {
     );
   };
 
-  // ── Users Tab ────────────────────────────────────────────────────────────
+  // ═══════════════════════════════════════════════════════════════════════
+  // ── USERS TAB ──────────────────────────────────────────────────────────
+  // ═══════════════════════════════════════════════════════════════════════
 
   const renderUsersTab = () => {
     if (loading || !data) return <LoadingSkeleton />;
@@ -574,7 +637,7 @@ export default function AdminDashboard() {
     );
     return (
       <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
-        <div className="flex items-center justify-between gap-4">
+        <div className="flex items-center justify-between gap-4 flex-wrap">
           <h2 className="text-lg font-bold text-white flex items-center gap-2">
             <Users className="h-5 w-5 text-purple-400" />
             {locale === 'ar' ? 'المستخدمون' : 'Users'} ({data.totalUsers})
@@ -590,15 +653,16 @@ export default function AdminDashboard() {
         {filtered.length === 0 ? (
           <EmptyState icon={Users} title={locale === 'ar' ? 'لا يوجد مستخدمون' : 'No users'} desc={t('noData')} />
         ) : (
-          <div className="glass rounded-2xl border border-purple-500/10 overflow-hidden">
+          <div className="rounded-2xl border border-purple-500/10 bg-[#0f0f1a]/80 overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="bg-purple-500/5">
+                  <tr className="bg-[#0a0a0f]">
                     <th className="text-start px-5 py-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{t('name')}</th>
                     <th className="text-start px-5 py-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{t('email')}</th>
                     <th className="text-start px-5 py-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{locale === 'ar' ? 'الدور' : 'Role'}</th>
                     <th className="text-start px-5 py-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{locale === 'ar' ? 'تاريخ الانضمام' : 'Joined'}</th>
+                    <th className="text-start px-5 py-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{locale === 'ar' ? 'الحالة' : 'Status'}</th>
                     <th className="text-start px-5 py-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{locale === 'ar' ? 'إجراء' : 'Action'}</th>
                   </tr>
                 </thead>
@@ -610,19 +674,12 @@ export default function AdminDashboard() {
                           <Avatar className="h-8 w-8 ring-1 ring-purple-500/20">
                             <AvatarFallback className={cn(
                               'text-white text-xs font-bold',
-                              deactivatedUsers.has(u.id)
+                              !u.active
                                 ? 'bg-gradient-to-br from-red-600 to-red-800'
                                 : 'bg-gradient-to-br from-purple-600 to-purple-800',
                             )}>{u.name.charAt(0)}</AvatarFallback>
                           </Avatar>
-                          <div className="flex items-center gap-2">
-                            <span className="text-white/90 text-sm font-medium">{u.name}</span>
-                            {deactivatedUsers.has(u.id) && (
-                              <span className="px-2 py-0.5 rounded-md text-[9px] font-bold bg-red-500/10 text-red-400 border border-red-500/20">
-                                {locale === 'ar' ? 'معطل' : 'Inactive'}
-                              </span>
-                            )}
-                          </div>
+                          <span className="text-white/90 text-sm font-medium">{u.name}</span>
                         </div>
                       </td>
                       <td className="px-5 py-3 text-muted-foreground text-xs">{u.email}</td>
@@ -634,19 +691,31 @@ export default function AdminDashboard() {
                       </td>
                       <td className="px-5 py-3 text-muted-foreground text-xs">{new Date(u.createdAt).toLocaleDateString()}</td>
                       <td className="px-5 py-3">
+                        <span className={cn('px-2.5 py-0.5 rounded-lg text-[10px] font-bold',
+                          u.active
+                            ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                            : 'bg-red-500/10 text-red-400 border border-red-500/20')}>
+                          {u.active ? (locale === 'ar' ? 'نشط' : 'Active') : (locale === 'ar' ? 'معطل' : 'Inactive')}
+                        </span>
+                      </td>
+                      <td className="px-5 py-3">
                         <motion.button
                           whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
-                          onClick={() => toggleUserActive(u.id, u.name)}
+                          disabled={togglingUser === u.id}
+                          onClick={() => toggleUserActive(u.id, u.active, u.name)}
                           className={cn(
                             'px-3 py-1 rounded-lg text-[10px] font-bold border flex items-center gap-1.5 w-fit transition-all',
-                            deactivatedUsers.has(u.id)
-                              ? 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20'
-                              : 'bg-red-500/10 text-red-400 border-red-500/20 hover:bg-red-500/20',
+                            u.active
+                              ? 'bg-red-500/10 text-red-400 border-red-500/20 hover:bg-red-500/20'
+                              : 'bg-emerald-500/10 text-emerald-400 border-emerald-500/20 hover:bg-emerald-500/20',
+                            togglingUser === u.id && 'opacity-60 pointer-events-none',
                           )}
                         >
-                          {deactivatedUsers.has(u.id)
-                            ? <><CheckCircle2 className="w-3 h-3" />{locale === 'ar' ? 'تفعيل' : 'Activate'}</>
-                            : <><Ban className="w-3 h-3" />{locale === 'ar' ? 'تعطيل' : 'Deactivate'}</>}
+                          {togglingUser === u.id
+                            ? <Loader2 className="w-3 h-3 animate-spin" />
+                            : u.active
+                              ? <><Ban className="w-3 h-3" />{locale === 'ar' ? 'تعطيل' : 'Deactivate'}</>
+                              : <><CheckCircle2 className="w-3 h-3" />{locale === 'ar' ? 'تفعيل' : 'Activate'}</>}
                         </motion.button>
                       </td>
                     </tr>
@@ -660,7 +729,9 @@ export default function AdminDashboard() {
     );
   };
 
-  // ── Providers Tab ────────────────────────────────────────────────────────
+  // ═══════════════════════════════════════════════════════════════════════
+  // ── PROVIDERS TAB ──────────────────────────────────────────────────────
+  // ═══════════════════════════════════════════════════════════════════════
 
   const renderProvidersTab = () => {
     if (loading || !data) return <LoadingSkeleton />;
@@ -674,17 +745,17 @@ export default function AdminDashboard() {
         {data.recentProviders.length === 0 ? (
           <EmptyState icon={Building2} title={locale === 'ar' ? 'لا يوجد مزودون' : 'No providers'} desc={t('noData')} />
         ) : (
-          <div className="glass rounded-2xl border border-purple-500/10 overflow-hidden">
+          <div className="rounded-2xl border border-purple-500/10 bg-[#0f0f1a]/80 overflow-hidden">
             <div className="overflow-x-auto">
               <table className="w-full text-sm">
                 <thead>
-                  <tr className="bg-purple-500/5">
+                  <tr className="bg-[#0a0a0f]">
                     <th className="text-start px-5 py-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{locale === 'ar' ? 'الشركة' : 'Company'}</th>
                     <th className="text-start px-5 py-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{locale === 'ar' ? 'البريد' : 'Email'}</th>
-                    <th className="text-start px-5 py-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{t('location')}</th>
                     <th className="text-start px-5 py-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{locale === 'ar' ? 'التقييم' : 'Rating'}</th>
                     <th className="text-start px-5 py-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{locale === 'ar' ? 'الخدمات' : 'Services'}</th>
-                    <th className="text-start px-5 py-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{locale === 'ar' ? 'الحالة' : 'Status'}</th>
+                    <th className="text-start px-5 py-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{locale === 'ar' ? 'الحساب' : 'Account'}</th>
+                    <th className="text-start px-5 py-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{locale === 'ar' ? 'التوثيق' : 'Verified'}</th>
                     <th className="text-start px-5 py-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{locale === 'ar' ? 'إجراء' : 'Action'}</th>
                   </tr>
                 </thead>
@@ -703,15 +774,22 @@ export default function AdminDashboard() {
                         </div>
                       </td>
                       <td className="px-5 py-3 text-muted-foreground text-xs">{p.user.email}</td>
-                      <td className="px-5 py-3 text-muted-foreground text-xs">{p.location || '—'}</td>
                       <td className="px-5 py-3">
-                        <div className="flex items-center gap-1 text-gold star-filled">
+                        <div className="flex items-center gap-1 text-amber-400">
                           <Star className="w-3 h-3 fill-current" />
                           <span className="text-xs font-bold">{p.rating.toFixed(1)}</span>
                           <span className="text-[10px] text-muted-foreground">({p.totalReviews})</span>
                         </div>
                       </td>
                       <td className="px-5 py-3 text-xs text-purple-400">{p._count.services}</td>
+                      <td className="px-5 py-3">
+                        <span className={cn('px-2.5 py-0.5 rounded-lg text-[10px] font-bold',
+                          p.user.active
+                            ? 'bg-emerald-500/10 text-emerald-400 border border-emerald-500/20'
+                            : 'bg-red-500/10 text-red-400 border border-red-500/20')}>
+                          {p.user.active ? (locale === 'ar' ? 'نشط' : 'Active') : (locale === 'ar' ? 'معطل' : 'Inactive')}
+                        </span>
+                      </td>
                       <td className="px-5 py-3">
                         <div className="flex items-center gap-2">
                           {p.verified ? (
@@ -720,7 +798,7 @@ export default function AdminDashboard() {
                             </span>
                           ) : (
                             <span className="px-2.5 py-0.5 rounded-lg text-[10px] font-bold bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 flex items-center gap-1">
-                              <Eye className="w-3 h-3" /> {locale === 'ar' ? 'بانتظار' : 'Pending'}
+                              <XCircle className="w-3 h-3" /> {locale === 'ar' ? 'بانتظار' : 'Pending'}
                             </span>
                           )}
                         </div>
@@ -753,80 +831,9 @@ export default function AdminDashboard() {
     );
   };
 
-  // ── Services Tab ─────────────────────────────────────────────────────────
-
-  const renderServicesTab = () => {
-    if (loading || !data) return <LoadingSkeleton />;
-    return (
-      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
-        <h2 className="text-lg font-bold text-white flex items-center gap-2">
-          <Package className="h-5 w-5 text-purple-400" />
-          {locale === 'ar' ? 'الخدمات' : 'Services'} ({data.totalServices})
-        </h2>
-
-        {data.recentServices.length === 0 ? (
-          <EmptyState icon={Package} title={locale === 'ar' ? 'لا توجد خدمات' : 'No services'} desc={t('noData')} />
-        ) : (
-          <div className="glass rounded-2xl border border-purple-500/10 overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm">
-                <thead>
-                  <tr className="bg-purple-500/5">
-                    <th className="text-start px-5 py-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{locale === 'ar' ? 'الخدمة' : 'Service'}</th>
-                    <th className="text-start px-5 py-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{locale === 'ar' ? 'المزود' : 'Provider'}</th>
-                    <th className="text-start px-5 py-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{locale === 'ar' ? 'التصنيف' : 'Category'}</th>
-                    <th className="text-start px-5 py-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{locale === 'ar' ? 'السعر' : 'Price'}</th>
-                    <th className="text-start px-5 py-3 text-[10px] font-semibold text-muted-foreground uppercase tracking-wider">{locale === 'ar' ? 'الحالة' : 'Status'}</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.recentServices.map(s => (
-                    <tr key={s.id} className="border-t border-purple-500/5 hover:bg-purple-500/5 transition-colors">
-                      <td className="px-5 py-3">
-                        <div className="flex items-center gap-3">
-                          <div className="w-10 h-10 rounded-lg overflow-hidden flex-shrink-0 bg-purple-500/10">
-                            {s.image ? <img src={s.image} alt="" className="w-full h-full object-cover" /> : (
-                              <div className="w-full h-full bg-gradient-to-br from-purple-500/10 to-purple-900/10 flex items-center justify-center">
-                                <Package className="w-4 h-4 text-purple-500/30" />
-                              </div>
-                            )}
-                          </div>
-                          <div className="min-w-0">
-                            <p className="text-white/90 text-xs font-medium truncate max-w-[150px]">{gt(s.titleAr, s.titleEn)}</p>
-                            {s.featured && (
-                              <span className="text-[9px] text-gold font-bold flex items-center gap-0.5">
-                                <Award className="w-2.5 h-2.5" /> {t('featured')}
-                              </span>
-                            )}
-                          </div>
-                        </div>
-                      </td>
-                      <td className="px-5 py-3 text-muted-foreground text-xs">{s.provider?.companyName || '—'}</td>
-                      <td className="px-5 py-3 text-muted-foreground text-xs">{s.category ? gt(s.category.nameAr, s.category.nameEn) : '—'}</td>
-                      <td className="px-5 py-3 text-xs font-bold text-gradient-gold">{s.price.toLocaleString()} {t('dzd')}</td>
-                      <td className="px-5 py-3">
-                        {s.active ? (
-                          <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
-                            {locale === 'ar' ? 'نشط' : 'Active'}
-                          </span>
-                        ) : (
-                          <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-red-500/10 text-red-400 border border-red-500/20">
-                            {locale === 'ar' ? 'غير نشط' : 'Inactive'}
-                          </span>
-                        )}
-                      </td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </div>
-        )}
-      </motion.div>
-    );
-  };
-
-  // ── Bookings Tab ─────────────────────────────────────────────────────────
+  // ═══════════════════════════════════════════════════════════════════════
+  // ── BOOKINGS TAB ───────────────────────────────────────────────────────
+  // ═══════════════════════════════════════════════════════════════════════
 
   const renderBookingsTab = () => {
     if (loading || !data) return <LoadingSkeleton />;
@@ -847,8 +854,8 @@ export default function AdminDashboard() {
                 onClick={() => setBookingStatusFilter(f)}
                 className={cn('px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all border',
                   bookingStatusFilter === f
-                    ? 'btn-purple-gradient text-white border-purple-500/30 shadow-lg shadow-purple-500/20'
-                    : 'glass text-muted-foreground border-purple-500/10 hover:text-purple-300 hover:border-purple-500/20'
+                    ? 'bg-purple-600 text-white border-purple-500/30 shadow-lg shadow-purple-500/20'
+                    : 'bg-[#0f0f1a]/80 text-muted-foreground border-purple-500/10 hover:text-purple-300 hover:border-purple-500/20'
                 )}>
                 {f === 'all' ? t('all') : statusLabel(f)}
               </motion.button>
@@ -863,7 +870,7 @@ export default function AdminDashboard() {
             {filtered.map((b, idx) => (
               <motion.div key={b.id} initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }}
                 transition={{ delay: idx * 0.04 }}
-                className="card-ornament glass rounded-2xl p-5 border border-purple-500/10 card-hover">
+                className="rounded-2xl p-5 border border-purple-500/10 bg-[#0f0f1a]/80 hover:bg-[#0f0f1a] transition-colors">
                 <div className="flex flex-col sm:flex-row gap-4">
                   <div className="w-full sm:w-28 h-20 rounded-xl overflow-hidden flex-shrink-0">
                     {b.service.image ? <img src={b.service.image} alt="" className="w-full h-full object-cover" /> : (
@@ -881,7 +888,7 @@ export default function AdminDashboard() {
                       <span className="flex items-center gap-1"><Users className="w-3 h-3 text-purple-400" /> {b.numberOfPeople}</span>
                     </div>
                     <div className="flex items-center justify-between pt-3 border-t border-purple-500/10">
-                      <p className="text-lg font-black text-gradient-gold">{b.totalPrice.toLocaleString()} <span className="text-xs text-gold/60">{t('dzd')}</span></p>
+                      <p className="text-lg font-black text-gradient-gold">{b.totalPrice.toLocaleString()} <span className="text-xs text-amber-500/60">{t('dzd')}</span></p>
                       <div className="flex gap-2">
                         {b.status === 'pending' && (
                           <>
@@ -900,7 +907,7 @@ export default function AdminDashboard() {
                         {b.status === 'confirmed' && (
                           <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
                             onClick={() => updateBookingStatus(b.id, 'completed')}
-                            className="btn-purple-gradient px-3 py-1.5 rounded-lg text-xs text-white flex items-center gap-1">
+                            className="px-3 py-1.5 rounded-lg bg-purple-600 text-xs text-white flex items-center gap-1">
                             <CheckCircle2 className="w-3 h-3" /> {t('bookingCompleted')}
                           </motion.button>
                         )}
@@ -916,7 +923,163 @@ export default function AdminDashboard() {
     );
   };
 
-  // ── Settings Tab ─────────────────────────────────────────────────────────
+  // ═══════════════════════════════════════════════════════════════════════
+  // ── COMPLAINTS TAB ─────────────────────────────────────────────────────
+  // ═══════════════════════════════════════════════════════════════════════
+
+  const renderComplaintsTab = () => {
+    if (complaintsLoading) return <LoadingSkeleton />;
+
+    const filtered = complaintFilter === 'all'
+      ? complaints
+      : complaints.filter(c => c.status === complaintFilter);
+
+    const complaintStatuses = ['all', 'open', 'in_progress', 'resolved', 'closed'] as const;
+    const complaintStatusLabel = (s: string) => {
+      const m: Record<string, string> = {
+        all: t('all'),
+        open: locale === 'ar' ? 'مفتوحة' : 'Open',
+        in_progress: locale === 'ar' ? 'قيد المراجعة' : 'In Progress',
+        resolved: locale === 'ar' ? 'تم الحل' : 'Resolved',
+        closed: locale === 'ar' ? 'مغلقة' : 'Closed',
+      };
+      return m[s] || s;
+    };
+
+    return (
+      <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6">
+        <div className="flex items-center justify-between gap-4 flex-wrap">
+          <h2 className="text-lg font-bold text-white flex items-center gap-2">
+            <MessageSquareWarning className="h-5 w-5 text-purple-400" />
+            {locale === 'ar' ? 'الشكاوى' : 'Complaints'} ({complaints.length})
+          </h2>
+          <div className="flex gap-2 flex-wrap">
+            {complaintStatuses.map(f => (
+              <motion.button key={f} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
+                onClick={() => setComplaintFilter(f)}
+                className={cn('px-3 py-1.5 rounded-lg text-[11px] font-semibold transition-all border',
+                  complaintFilter === f
+                    ? 'bg-purple-600 text-white border-purple-500/30 shadow-lg shadow-purple-500/20'
+                    : 'bg-[#0f0f1a]/80 text-muted-foreground border-purple-500/10 hover:text-purple-300 hover:border-purple-500/20'
+                )}>
+                {complaintStatusLabel(f)}
+              </motion.button>
+            ))}
+          </div>
+        </div>
+
+        {filtered.length === 0 ? (
+          <EmptyState icon={MessageSquareWarning} title={locale === 'ar' ? 'لا توجد شكاوى' : 'No complaints'} desc={t('noData')} />
+        ) : (
+          <div className="space-y-4">
+            {filtered.map((c, idx) => (
+              <motion.div key={c.id} initial={{ opacity: 0, y: 15 }} animate={{ opacity: 1, y: 0 }}
+                transition={{ delay: idx * 0.04 }}
+                className="rounded-2xl p-5 border border-purple-500/10 bg-[#0f0f1a]/80 hover:bg-[#0f0f1a] transition-colors">
+                {/* Header */}
+                <div className="flex items-start justify-between gap-3 mb-3">
+                  <div className="flex items-center gap-3">
+                    <Avatar className="h-9 w-9 ring-1 ring-purple-500/20">
+                      <AvatarImage src={c.user.avatar || undefined} />
+                      <AvatarFallback className="bg-gradient-to-br from-purple-600 to-purple-800 text-white text-xs font-bold">{c.user.name.charAt(0)}</AvatarFallback>
+                    </Avatar>
+                    <div>
+                      <p className="text-sm font-semibold text-white">{c.user.name}</p>
+                      <p className="text-[10px] text-muted-foreground">{c.user.email} · {new Date(c.createdAt).toLocaleDateString()}</p>
+                    </div>
+                  </div>
+                  <ComplaintStatusBadge status={c.status} />
+                </div>
+
+                {/* Subject & Content */}
+                <h3 className="font-bold text-sm text-white mb-1.5">{c.subject}</h3>
+                <p className="text-xs text-white/60 leading-relaxed mb-4 line-clamp-3">{c.content}</p>
+
+                {/* Admin Reply */}
+                {c.adminReply && (
+                  <div className="rounded-xl p-3 mb-4 bg-purple-500/5 border border-purple-500/10">
+                    <div className="flex items-center gap-2 mb-1">
+                      <Reply className="w-3.5 h-3.5 text-purple-400" />
+                      <span className="text-[10px] font-bold text-purple-400 uppercase tracking-wider">{locale === 'ar' ? 'رد المسؤول' : 'Admin Reply'}</span>
+                    </div>
+                    <p className="text-xs text-white/70 leading-relaxed">{c.adminReply}</p>
+                  </div>
+                )}
+
+                {/* Actions */}
+                <div className="flex items-center gap-2 flex-wrap">
+                  {c.status !== 'resolved' && c.status !== 'closed' && (
+                    <>
+                      <motion.button
+                        whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
+                        onClick={() => { setReplyingTo(replyingTo === c.id ? null : c.id); setReplyText(''); }}
+                        className="px-3 py-1.5 rounded-lg bg-purple-500/10 border border-purple-500/20 text-xs text-purple-400 hover:bg-purple-500/20 transition-all flex items-center gap-1">
+                        <Reply className="w-3 h-3" />
+                        {locale === 'ar' ? 'رد' : 'Reply'}
+                      </motion.button>
+                      <motion.button
+                        whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
+                        onClick={() => handleResolveComplaint(c.id)}
+                        className="px-3 py-1.5 rounded-lg bg-emerald-500/10 border border-emerald-500/20 text-xs text-emerald-400 hover:bg-emerald-500/20 transition-all flex items-center gap-1">
+                        <CheckCircle2 className="w-3 h-3" />
+                        {locale === 'ar' ? 'حل' : 'Resolve'}
+                      </motion.button>
+                    </>
+                  )}
+                </div>
+
+                {/* Inline Reply Form */}
+                <AnimatePresence>
+                  {replyingTo === c.id && (
+                    <motion.div
+                      initial={{ opacity: 0, height: 0 }}
+                      animate={{ opacity: 1, height: 'auto' }}
+                      exit={{ opacity: 0, height: 0 }}
+                      className="mt-4 overflow-hidden"
+                    >
+                      <div className="flex gap-2">
+                        <textarea
+                          value={replyText}
+                          onChange={e => setReplyText(e.target.value)}
+                          placeholder={locale === 'ar' ? 'اكتب ردك هنا...' : 'Write your reply here...'}
+                          rows={3}
+                          className="flex-1 px-4 py-3 rounded-xl bg-white/5 border border-purple-500/15 text-white text-sm placeholder:text-white/20 focus-visible:ring-purple-500/30 resize-none"
+                        />
+                      </div>
+                      <div className="flex justify-end gap-2 mt-2">
+                        <motion.button
+                          whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
+                          onClick={() => { setReplyingTo(null); setReplyText(''); }}
+                          className="px-3 py-1.5 rounded-lg text-xs text-muted-foreground hover:text-white transition-all"
+                        >
+                          {locale === 'ar' ? 'إلغاء' : 'Cancel'}
+                        </motion.button>
+                        <motion.button
+                          whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
+                          disabled={sendingReply === c.id || !replyText.trim()}
+                          onClick={() => handleReplyComplaint(c.id)}
+                          className="px-4 py-1.5 rounded-lg bg-purple-600 text-white text-xs font-medium hover:bg-purple-500 transition-all flex items-center gap-1.5 disabled:opacity-40"
+                        >
+                          {sendingReply === c.id
+                            ? <Loader2 className="w-3 h-3 animate-spin" />
+                            : <Send className="w-3 h-3" />}
+                          {locale === 'ar' ? 'إرسال الرد' : 'Send Reply'}
+                        </motion.button>
+                      </div>
+                    </motion.div>
+                  )}
+                </AnimatePresence>
+              </motion.div>
+            ))}
+          </div>
+        )}
+      </motion.div>
+    );
+  };
+
+  // ═══════════════════════════════════════════════════════════════════════
+  // ── SETTINGS TAB ──────────────────────────────────────────────────────
+  // ═══════════════════════════════════════════════════════════════════════
 
   const handleResetCache = () => {
     showToast(locale === 'ar' ? 'تم مسح ذاكرة التخزين المؤقت' : 'Cache cleared', 'success');
@@ -934,7 +1097,7 @@ export default function AdminDashboard() {
       </h2>
 
       {/* Platform Information */}
-      <div className="glass rounded-2xl p-6 border border-purple-500/10 space-y-6">
+      <div className="rounded-2xl p-6 border border-purple-500/10 bg-[#0f0f1a]/80 space-y-6">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-purple-600 to-purple-800 flex items-center justify-center">
             <Info className="w-5 h-5 text-white" />
@@ -972,7 +1135,7 @@ export default function AdminDashboard() {
           </div>
           <div className="px-4 py-3 rounded-xl bg-purple-500/5 border border-purple-500/10">
             <div className="flex items-center gap-2 mb-1">
-              <HardDrive className="w-3.5 h-3.5 text-gold" />
+              <HardDrive className="w-3.5 h-3.5 text-amber-400" />
               <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">{locale === 'ar' ? 'إجمالي التخزين' : 'Total Storage'}</p>
             </div>
             <p className="text-sm font-bold text-white">{(data?.totalUsers || 0) + (data?.totalProviders || 0) + (data?.totalServices || 0) + (data?.totalBookings || 0) + (data?.totalReviews || 0)} {locale === 'ar' ? 'سجل' : 'records'}</p>
@@ -981,7 +1144,7 @@ export default function AdminDashboard() {
       </div>
 
       {/* Admin Permissions */}
-      <div className="glass rounded-2xl p-6 border border-purple-500/10 space-y-4">
+      <div className="rounded-2xl p-6 border border-purple-500/10 bg-[#0f0f1a]/80 space-y-4">
         <div className="flex items-center gap-3">
           <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-emerald-600 to-emerald-800 flex items-center justify-center">
             <Shield className="w-5 h-5 text-white" />
@@ -995,14 +1158,15 @@ export default function AdminDashboard() {
           <p className="flex items-center gap-2"><CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> {locale === 'ar' ? 'عرض جميع البيانات' : 'View all data'}</p>
           <p className="flex items-center gap-2"><CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> {locale === 'ar' ? 'إدارة الحجوزات' : 'Manage bookings'}</p>
           <p className="flex items-center gap-2"><CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> {locale === 'ar' ? 'التحقق من المزودين' : 'Verify providers'}</p>
-          <p className="flex items-center gap-2"><CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> {locale === 'ar' ? 'إدارة المستخدمين' : 'Manage users'}</p>
+          <p className="flex items-center gap-2"><CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> {locale === 'ar' ? 'إدارة المستخدمين (تفعيل/تعطيل)' : 'Manage users (activate/deactivate)'}</p>
+          <p className="flex items-center gap-2"><CheckCircle2 className="w-3.5 h-3.5 text-emerald-400" /> {locale === 'ar' ? 'الرد على الشكاوى' : 'Reply to complaints'}</p>
         </div>
       </div>
 
       {/* Quick Actions */}
-      <div className="glass rounded-2xl p-6 border border-purple-500/10 space-y-4">
+      <div className="rounded-2xl p-6 border border-purple-500/10 bg-[#0f0f1a]/80 space-y-4">
         <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-gold-dark to-gold flex items-center justify-center">
+          <div className="w-10 h-10 rounded-xl bg-gradient-to-br from-amber-700 to-amber-500 flex items-center justify-center">
             <Zap className="w-5 h-5 text-white" />
           </div>
           <div>
@@ -1042,73 +1206,149 @@ export default function AdminDashboard() {
 
       {/* Stats Summary */}
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-        <div className="glass rounded-2xl p-4 border border-purple-500/10">
+        <div className="rounded-2xl p-4 border border-purple-500/10 bg-[#0f0f1a]/80">
           <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">{locale === 'ar' ? 'إجمالي المستخدمين' : 'Total Users'}</p>
-          <p className="text-xl font-bold text-gradient-purple mt-1">{data?.totalUsers || 0}</p>
+          <p className="text-xl font-bold text-gradient-purple mt-1"><AnimatedCounter target={data?.totalUsers || 0} /></p>
         </div>
-        <div className="glass rounded-2xl p-4 border border-purple-500/10">
+        <div className="rounded-2xl p-4 border border-purple-500/10 bg-[#0f0f1a]/80">
           <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">{locale === 'ar' ? 'إجمالي المزودين' : 'Total Providers'}</p>
-          <p className="text-xl font-bold text-gradient-purple mt-1">{data?.totalProviders || 0}</p>
+          <p className="text-xl font-bold text-gradient-purple mt-1"><AnimatedCounter target={data?.totalProviders || 0} /></p>
         </div>
-        <div className="glass rounded-2xl p-4 border border-purple-500/10">
+        <div className="rounded-2xl p-4 border border-purple-500/10 bg-[#0f0f1a]/80">
           <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">{locale === 'ar' ? 'إجمالي الخدمات' : 'Total Services'}</p>
-          <p className="text-xl font-bold text-gradient-purple mt-1">{data?.totalServices || 0}</p>
+          <p className="text-xl font-bold text-gradient-purple mt-1"><AnimatedCounter target={data?.totalServices || 0} /></p>
         </div>
-        <div className="glass rounded-2xl p-4 border border-purple-500/10">
+        <div className="rounded-2xl p-4 border border-purple-500/10 bg-[#0f0f1a]/80">
           <p className="text-[10px] text-muted-foreground font-medium uppercase tracking-wider">{locale === 'ar' ? 'إجمالي الإيرادات' : 'Total Revenue'}</p>
-          <p className="text-xl font-bold text-gradient-gold mt-1">{(data?.totalRevenue || 0).toLocaleString()}</p>
-          <p className="text-[10px] text-gold/60 -mt-0.5">{t('dzd')}</p>
+          <p className="text-xl font-bold text-gradient-gold mt-1"><AnimatedCounter target={data?.totalRevenue || 0} /></p>
+          <p className="text-[10px] text-amber-500/60 -mt-0.5">{t('dzd')}</p>
         </div>
       </div>
     </motion.div>
   );
 
-  // ── Render ────────────────────────────────────────────────────────────────
+  // ═══════════════════════════════════════════════════════════════════════
+  // ── MAIN RENDER ───────────────────────────────────────────────────────
+  // ═══════════════════════════════════════════════════════════════════════
 
   return (
-    <div className="min-h-screen bg-mesh-gradient">
-      {/* Mobile Top Bar */}
-      <div className="lg:hidden fixed top-0 inset-x-0 z-40 glass--scrolled border-b border-purple-500/10 px-4 py-3 flex items-center justify-between">
-        <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
-          <SheetTrigger asChild>
-            <Button variant="ghost" size="icon" className="text-purple-400 hover:bg-purple-500/10">
-              <Menu className="h-5 w-5" />
-            </Button>
-          </SheetTrigger>
-          <SheetContent side={isRTL ? 'right' : 'left'} className="w-72 p-0 glass border-purple-500/10 bg-gradient-to-b from-gray-900 to-purple-950/30">
-            <SheetTitle className="sr-only">Admin Menu</SheetTitle>
-            {renderSidebarContent()}
-          </SheetContent>
-        </Sheet>
-        <div className="flex items-center gap-2">
-          <img src="/images/logo.png" alt="REVIVE" className="w-8 h-8 rounded-lg" />
-          <Shield className="w-4 h-4 text-gold" />
+    <div className="min-h-screen bg-[#08080d]">
+      {/* Desktop Sidebar */}
+      <motion.aside
+        initial={false}
+        animate={{ width: sidebarOpen ? SIDEBAR_WIDTH : 72 }}
+        transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+        className="hidden lg:block fixed top-0 right-0 bottom-0 z-40 flex flex-col bg-gradient-to-b from-[#0f0f1a] to-[#0a0a0f] border-s border-purple-500/10"
+      >
+        {/* Logo */}
+        <div className="h-16 flex items-center justify-between px-4 border-b border-purple-500/10">
+          <AnimatePresence mode="wait">
+            {sidebarOpen && (
+              <motion.div initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex items-center gap-2.5">
+                <img src="/images/logo.png" alt="REVIVE" className="w-9 h-9 rounded-xl" />
+                <div>
+                  <p className="text-sm font-bold text-white leading-tight">{locale === 'ar' ? 'لوحة الإدارة' : 'Admin Panel'}</p>
+                  <p className="text-[10px] text-purple-400/60 flex items-center gap-1">
+                    <Shield className="w-2.5 h-2.5" />
+                    {locale === 'ar' ? 'مسؤول النظام' : 'System Admin'}
+                  </p>
+                </div>
+              </motion.div>
+            )}
+          </AnimatePresence>
+          {!sidebarOpen && (
+            <div className="w-9 h-9 rounded-xl mx-auto">
+              <img src="/images/logo.png" alt="REVIVE" className="w-9 h-9 rounded-xl" />
+            </div>
+          )}
         </div>
-        <Avatar className="h-8 w-8 ring-2 ring-purple-500/50">
-          <AvatarFallback className="bg-gradient-to-br from-purple-600 to-purple-800 text-white text-xs font-bold">A</AvatarFallback>
-        </Avatar>
-      </div>
 
-      <div className="flex">
-        {/* Desktop Sidebar */}
-        <aside className="hidden lg:block fixed top-0 left-0 bottom-0 w-72 z-30 glass border-e border-purple-500/10 bg-gradient-to-b from-gray-900 to-purple-950/30">
-            {renderSidebarContent()}
-        </aside>
+        {/* Nav */}
+        <ScrollArea className="flex-1 py-3 px-2">
+          <nav className="space-y-1">
+            {navItems.map((item) => {
+              const Icon = item.icon;
+              const isActive = activeTab === item.id;
+              return (
+                <button key={item.id} onClick={() => setActiveTab(item.id)}
+                  className={cn('w-full flex items-center gap-3 rounded-xl text-sm font-medium transition-all duration-200 relative group',
+                    sidebarOpen ? 'px-3 py-2.5' : 'px-0 py-2.5 justify-center',
+                    isActive ? 'bg-purple-600/15 text-purple-300' : 'text-white/50 hover:text-white/80 hover:bg-white/5')}>
+                  {isActive && <motion.div layoutId="admin-sidebar-active" className="absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-full bg-gradient-to-b from-purple-400 to-purple-600" transition={{ type: 'spring', stiffness: 300, damping: 30 }} />}
+                  <Icon className={cn('h-5 w-5 flex-shrink-0', isActive && 'text-purple-300')} />
+                  {sidebarOpen && <span className="flex-1 text-start">{item.label}</span>}
+                  {sidebarOpen && item.badge && item.badge > 0 && <span className="text-[10px] font-bold bg-purple-500/20 text-purple-300 px-1.5 py-0.5 rounded-md">{item.badge}</span>}
+                </button>
+              );
+            })}
+          </nav>
+        </ScrollArea>
 
-        {/* Main */}
-        <main className="flex-1 lg:ms-72 pt-20 lg:pt-0 min-h-screen">
-          <div className="max-w-7xl mx-auto p-4 sm:p-6 lg:p-8">
-            <AnimatePresence mode="wait">
-              {activeTab === 'overview' && <motion.div key="overview" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>{renderOverviewTab()}</motion.div>}
-              {activeTab === 'users' && <motion.div key="users" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>{renderUsersTab()}</motion.div>}
-              {activeTab === 'providers' && <motion.div key="providers" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>{renderProvidersTab()}</motion.div>}
-              {activeTab === 'services' && <motion.div key="services" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>{renderServicesTab()}</motion.div>}
-              {activeTab === 'bookings' && <motion.div key="bookings" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>{renderBookingsTab()}</motion.div>}
-              {activeTab === 'settings' && <motion.div key="settings" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>{renderSettingsTab()}</motion.div>}
-            </AnimatePresence>
+        {/* Bottom */}
+        <div className="px-2 py-3 border-t border-purple-500/10">
+          <button onClick={() => useAppStore.getState().navigateTo('home')}
+            className={cn('w-full flex items-center gap-3 rounded-xl text-sm font-medium text-white/40 hover:text-white/70 hover:bg-white/5 transition-all',
+              sidebarOpen ? 'px-3 py-2.5' : 'px-0 py-2.5 justify-center')}>
+            <Home className="h-5 w-5 flex-shrink-0" />
+            {sidebarOpen && <span>{locale === 'ar' ? 'العودة للموقع' : 'Back to Home'}</span>}
+          </button>
+        </div>
+      </motion.aside>
+
+      {/* Main Area */}
+      <motion.main
+        initial={false}
+        animate={{ marginRight: sidebarOpen ? SIDEBAR_WIDTH : 72 }}
+        transition={{ type: 'spring', stiffness: 300, damping: 30 }}
+        className="min-h-screen flex flex-col"
+      >
+        {/* Top Bar */}
+        <div className="sticky top-0 z-30 h-16 flex items-center justify-between px-6 border-b border-purple-500/10 bg-[#08080d]/80 backdrop-blur-md">
+          <div className="flex items-center gap-3">
+            {/* Mobile hamburger */}
+            <Sheet open={mobileSheetOpen} onOpenChange={setMobileSheetOpen}>
+              <SheetTrigger asChild>
+                <button className="lg:hidden w-9 h-9 rounded-lg bg-white/5 hover:bg-white/10 flex items-center justify-center text-white/50 hover:text-white transition-all">
+                  <Menu className="w-4 h-4" />
+                </button>
+              </SheetTrigger>
+              <SheetContent side={isRTL ? 'right' : 'left'} className="w-[280px] p-0 bg-gradient-to-b from-[#0f0f1a] to-[#0a0a0f] border-purple-500/10">
+                <SheetTitle className="sr-only">Admin Menu</SheetTitle>
+                {renderSidebarContent()}
+              </SheetContent>
+            </Sheet>
+            {/* Desktop toggle */}
+            <button onClick={() => setSidebarOpen(!sidebarOpen)}
+              className="hidden lg:flex w-9 h-9 rounded-lg bg-white/5 hover:bg-white/10 items-center justify-center text-white/50 hover:text-white transition-all">
+              <Menu className="w-4 h-4" />
+            </button>
+            <h2 className="text-sm font-semibold text-white hidden sm:block">
+              {navItems.find(n => n.id === activeTab)?.label}
+            </h2>
           </div>
-        </main>
-      </div>
+          <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
+              <img src="/images/logo.png" alt="REVIVE" className="w-7 h-7 rounded-lg lg:hidden" />
+              <Shield className="w-4 h-4 text-amber-400 lg:hidden" />
+            </div>
+            <Avatar className="h-8 w-8 ring-2 ring-purple-500/30">
+              <AvatarFallback className="bg-gradient-to-br from-purple-600 to-purple-800 text-white text-xs font-bold">A</AvatarFallback>
+            </Avatar>
+          </div>
+        </div>
+
+        {/* Page Content */}
+        <div className="flex-1 p-5 sm:p-6">
+          <AnimatePresence mode="wait">
+            {activeTab === 'overview' && <motion.div key="overview" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>{renderOverviewTab()}</motion.div>}
+            {activeTab === 'users' && <motion.div key="users" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>{renderUsersTab()}</motion.div>}
+            {activeTab === 'providers' && <motion.div key="providers" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>{renderProvidersTab()}</motion.div>}
+            {activeTab === 'bookings' && <motion.div key="bookings" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>{renderBookingsTab()}</motion.div>}
+            {activeTab === 'complaints' && <motion.div key="complaints" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>{renderComplaintsTab()}</motion.div>}
+            {activeTab === 'settings' && <motion.div key="settings" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>{renderSettingsTab()}</motion.div>}
+          </AnimatePresence>
+        </div>
+      </motion.main>
     </div>
   );
 }
