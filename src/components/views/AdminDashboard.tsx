@@ -268,7 +268,7 @@ export default function AdminDashboard() {
       { label: locale === 'ar' ? 'المزودون' : 'Providers', value: data.totalProviders, icon: Building2, gradient: 'bg-gradient-to-br from-indigo-600 to-purple-700', isGold: false },
       { label: locale === 'ar' ? 'الخدمات' : 'Services', value: data.totalServices, icon: Package, gradient: 'bg-gradient-to-br from-emerald-600 to-emerald-800', isGold: false },
       { label: locale === 'ar' ? 'الحجوزات' : 'Bookings', value: data.totalBookings, icon: CalendarCheck, gradient: 'bg-gradient-to-br from-teal-500 to-teal-700', isGold: false },
-      { label: locale === 'ar' ? 'الإيرادات' : 'Revenue', value: data.totalRevenue, icon: DollarSign, gradient: 'bg-gradient-to-br from-gold-dark to-gold', isGold: true, suffix: t('sar') },
+      { label: locale === 'ar' ? 'الإيرادات' : 'Revenue', value: data.totalRevenue, icon: DollarSign, gradient: 'bg-gradient-to-br from-gold-dark to-gold', isGold: true, suffix: t('dzd') },
       { label: locale === 'ar' ? 'التقييمات' : 'Reviews', value: data.totalReviews, icon: Star, gradient: 'bg-gradient-to-br from-gold-dark to-gold-light', isGold: true },
       { label: locale === 'ar' ? 'التصنيفات' : 'Categories', value: data.totalCategories, icon: Globe, gradient: 'bg-gradient-to-br from-pink-600 to-purple-700', isGold: false },
       { label: locale === 'ar' ? 'قيد الانتظار' : 'Pending', value: data.pendingBookings, icon: TrendingUp, gradient: 'bg-gradient-to-br from-yellow-600 to-orange-700', isGold: false },
@@ -335,7 +335,7 @@ export default function AdminDashboard() {
                   <Tooltip
                     contentStyle={{ borderRadius: '16px', border: '1px solid rgba(139,92,246,0.2)',
                       boxShadow: '0 8px 32px rgba(0,0,0,0.3)', backdropFilter: 'blur(16px)', background: 'rgba(10,10,15,0.95)', color: '#fff' }}
-                    formatter={(value: number) => [`${value.toLocaleString()} ${t('sar')}`, locale === 'ar' ? 'الإيرادات' : 'Revenue']}
+                    formatter={(value: number) => [`${value.toLocaleString()} ${t('dzd')}`, locale === 'ar' ? 'الإيرادات' : 'Revenue']}
                     cursor={{ fill: 'rgba(139,92,246,0.06)' }}
                   />
                   <Bar dataKey="revenue" fill="url(#adminPurpleGrad)" radius={[8, 8, 0, 0]} maxBarSize={48} />
@@ -374,7 +374,7 @@ export default function AdminDashboard() {
                         <td className="px-4 py-3 text-white/80 text-xs truncate max-w-[100px]">{b.user.name}</td>
                         <td className="px-4 py-3 text-white/80 text-xs truncate max-w-[120px]">{gt(b.service.titleAr, b.service.titleEn)}</td>
                         <td className="px-4 py-3"><StatusBadge status={b.status} label={statusLabel(b.status)} /></td>
-                        <td className="px-4 py-3 text-xs font-bold text-gradient-gold">{b.totalPrice.toLocaleString()} {t('sar')}</td>
+                        <td className="px-4 py-3 text-xs font-bold text-gradient-gold">{b.totalPrice.toLocaleString()} {t('dzd')}</td>
                       </tr>
                     ))}
                   </tbody>
@@ -673,7 +673,7 @@ export default function AdminDashboard() {
                       </td>
                       <td className="px-5 py-3 text-muted-foreground text-xs">{s.provider?.companyName || '—'}</td>
                       <td className="px-5 py-3 text-muted-foreground text-xs">{s.category ? gt(s.category.nameAr, s.category.nameEn) : '—'}</td>
-                      <td className="px-5 py-3 text-xs font-bold text-gradient-gold">{s.price.toLocaleString()} {t('sar')}</td>
+                      <td className="px-5 py-3 text-xs font-bold text-gradient-gold">{s.price.toLocaleString()} {t('dzd')}</td>
                       <td className="px-5 py-3">
                         {s.active ? (
                           <span className="px-2 py-0.5 rounded-md text-[10px] font-bold bg-emerald-500/10 text-emerald-400 border border-emerald-500/20">
@@ -751,7 +751,7 @@ export default function AdminDashboard() {
                       <span className="flex items-center gap-1"><Users className="w-3 h-3 text-purple-400" /> {b.numberOfPeople}</span>
                     </div>
                     <div className="flex items-center justify-between pt-3 border-t border-purple-500/10">
-                      <p className="text-lg font-black text-gradient-gold">{b.totalPrice.toLocaleString()} <span className="text-xs text-gold/60">{t('sar')}</span></p>
+                      <p className="text-lg font-black text-gradient-gold">{b.totalPrice.toLocaleString()} <span className="text-xs text-gold/60">{t('dzd')}</span></p>
                       <div className="flex gap-2">
                         {b.status === 'pending' && (
                           <>
@@ -802,7 +802,7 @@ export default function AdminDashboard() {
         </div>
         <div className="px-4 py-3 rounded-xl bg-purple-500/5 border border-purple-500/10">
           <p className="text-xs text-muted-foreground">{locale === 'ar' ? 'إجمالي الإيرادات' : 'Total Revenue'}</p>
-          <p className="text-lg font-bold text-gradient-gold mt-0.5">{(data?.totalRevenue || 0).toLocaleString()} {t('sar')}</p>
+          <p className="text-lg font-bold text-gradient-gold mt-0.5">{(data?.totalRevenue || 0).toLocaleString()} {t('dzd')}</p>
         </div>
       </div>
       <div className="p-5 rounded-xl bg-purple-500/5 border border-purple-500/10">

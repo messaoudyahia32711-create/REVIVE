@@ -4,10 +4,12 @@ import { useState, useEffect, useCallback, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Search, SlidersHorizontal, Star, Clock, MapPin, Users,
-  ChevronDown, ChevronRight, X, Mountain, Building2, Waves,
-  Fish, Compass, Ship, Crown, Home, Loader2
+  ChevronDown, ChevronRight, X, Stethoscope, HeartPulse,
+  Smile, Eye, Leaf, Pill, Bone, Apple, Home, Loader2,
+  ChevronUp, MapPinned,
 } from 'lucide-react';
 import { useAppStore } from '@/lib/store';
+import { WILAYAS, getWilayaName, searchWilayas } from '@/lib/wilayas';
 
 /* ═══════════════════════════════════════════════════════════════════════════
    Types
@@ -22,6 +24,7 @@ interface Service {
   price: number;
   duration: string;
   maxPeople: number;
+  wilaya: string;
   location: string;
   image: string | null;
   rating: number;
@@ -40,19 +43,34 @@ interface Category {
 }
 
 /* ═══════════════════════════════════════════════════════════════════════════
-   Static Maps
+   Static Maps — medical specialty icons
    ═══════════════════════════════════════════════════════════════════════════ */
 
 const categoryIconMap: Record<string, React.ReactNode> = {
-  adventure: <Mountain className="w-4 h-4" />,
-  city: <Building2 className="w-4 h-4" />,
-  beach: <Waves className="w-4 h-4" />,
-  diving: <Fish className="w-4 h-4" />,
-  desert: <Compass className="w-4 h-4" />,
-  cruise: <Ship className="w-4 h-4" />,
+  generalMedicine: <Stethoscope className="w-4 h-4" />,
+  dentalCare: <Smile className="w-4 h-4" />,
+  physiotherapy: <HeartPulse className="w-4 h-4" />,
+  dermatology: <Eye className="w-4 h-4" />,
+  ophthalmology: <Eye className="w-4 h-4" />,
+  alternativeMedicine: <Leaf className="w-4 h-4" />,
+  cardiology: <HeartPulse className="w-4 h-4" />,
+  orthopedics: <Bone className="w-4 h-4" />,
+  nutrition: <Apple className="w-4 h-4" />,
+  default: <Stethoscope className="w-4 h-4" />,
 };
 
-const catKeys = ['adventure', 'city', 'beach', 'diving', 'desert', 'cruise'] as const;
+const medicalIconKeys = [
+  'generalMedicine', 'dentalCare', 'physiotherapy', 'dermatology',
+  'ophthalmology', 'alternativeMedicine', 'cardiology', 'orthopedics', 'nutrition',
+] as const;
+
+const getCategoryIcon = (icon: string): React.ReactNode => {
+  return categoryIconMap[icon] ?? categoryIconMap.default;
+};
+
+/* ═══════════════════════════════════════════════════════════════════════════
+   Sort Options
+   ═══════════════════════════════════════════════════════════════════════════ */
 
 const sortOptions = [
   { value: 'newest', key: 'newest' as const },
@@ -76,7 +94,7 @@ const cardVariants = {
   hidden: { opacity: 0, y: 36, scale: 0.96 },
   visible: {
     opacity: 1, y: 0, scale: 1,
-    transition: { duration: 0.5, ease: [0.22, 1, 0.36, 1] },
+    transition: { duration: 0.5, ease: [0.22, 1, 0.36, 1] as const },
   },
 };
 
@@ -88,6 +106,8 @@ const skeletonVariants = {
   }),
 };
 
+const dropdownTransition = { duration: 0.2, ease: [0.22, 1, 0.36, 1] as const };
+
 /* ═══════════════════════════════════════════════════════════════════════════
    Component
    ═══════════════════════════════════════════════════════════════════════════ */
@@ -96,6 +116,7 @@ export default function ServicesPage() {
   const {
     t, locale, isRTL, navigateTo,
     setSelectedServiceId, selectedCategoryId, setSelectedCategoryId,
+    selectedWilaya, setSelectedWilaya,
     searchQuery, setSearchQuery,
   } = useAppStore();
 
@@ -104,28 +125,35 @@ export default function ServicesPage() {
   const [loading, setLoading] = useState(true);
   const [sortBy, setSortBy] = useState('newest');
   const [showSort, setShowSort] = useState(false);
+  const [showWilayaDropdown, setShowWilayaDropdown] = useState(false);
+  const [wilayaSearch, setWilayaSearch] = useState('');
   const [searchInput, setSearchInput] = useState(searchQuery);
   const debounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const sortRef = useRef<HTMLDivElement>(null);
+  const wilayaDropdownRef = useRef<HTMLDivElement>(null);
 
-  /* ── Close sort dropdown on outside click ─────────────────────────────── */
+  /* ── Close dropdowns on outside click ───────────────────────────────── */
   useEffect(() => {
     const handler = (e: MouseEvent) => {
       if (sortRef.current && !sortRef.current.contains(e.target as Node)) {
         setShowSort(false);
+      }
+      if (wilayaDropdownRef.current && !wilayaDropdownRef.current.contains(e.target as Node)) {
+        setShowWilayaDropdown(false);
       }
     };
     document.addEventListener('mousedown', handler);
     return () => document.removeEventListener('mousedown', handler);
   }, []);
 
-  /* ── Fetch services ───────────────────────────────────────────────────── */
+  /* ── Fetch services with wilaya filter ──────────────────────────────── */
   const fetchServices = useCallback(async () => {
     setLoading(true);
     try {
       const params = new URLSearchParams();
       if (selectedCategoryId) params.set('categoryId', selectedCategoryId);
       if (searchQuery) params.set('search', searchQuery);
+      if (selectedWilaya) params.set('wilaya', selectedWilaya);
       if (sortBy) params.set('sort', sortBy);
       const res = await fetch(`/api/services?${params.toString()}`);
       if (res.ok) {
@@ -137,11 +165,11 @@ export default function ServicesPage() {
     } finally {
       setLoading(false);
     }
-  }, [selectedCategoryId, searchQuery, sortBy]);
+  }, [selectedCategoryId, searchQuery, selectedWilaya, sortBy]);
 
   useEffect(() => { fetchServices(); }, [fetchServices]);
 
-  /* ── Fetch categories ─────────────────────────────────────────────────── */
+  /* ── Fetch categories ───────────────────────────────────────────────── */
   useEffect(() => {
     async function loadCategories() {
       try {
@@ -155,7 +183,7 @@ export default function ServicesPage() {
     loadCategories();
   }, []);
 
-  /* ── Debounced search (300ms) ─────────────────────────────────────────── */
+  /* ── Debounced search (300ms) ───────────────────────────────────────── */
   const handleSearchChange = (value: string) => {
     setSearchInput(value);
     if (debounceRef.current) clearTimeout(debounceRef.current);
@@ -164,24 +192,36 @@ export default function ServicesPage() {
     }, 300);
   };
 
-  /* ── Helpers ──────────────────────────────────────────────────────────── */
+  /* ── Wilaya search filtering ────────────────────────────────────────── */
+  const filteredWilayas = wilayaSearch
+    ? searchWilayas(wilayaSearch)
+    : WILAYAS;
+
+  /* ── Helpers ─────────────────────────────────────────────────────────── */
   const clearFilters = () => {
     setSelectedCategoryId(null);
+    setSelectedWilaya(null);
     setSearchQuery('');
     setSearchInput('');
     setSortBy('newest');
+    setWilayaSearch('');
   };
 
   const serviceName = (s: Service) => locale === 'ar' ? s.titleAr : s.titleEn;
   const serviceDesc = (s: Service) => locale === 'ar' ? s.descriptionAr : s.descriptionEn;
 
-  const isFiltered = !!(selectedCategoryId || searchQuery);
+  const isFiltered = !!(selectedCategoryId || searchQuery || selectedWilaya);
 
-  /* ── Card click handler ───────────────────────────────────────────────── */
+  /* ── Card click handler ─────────────────────────────────────────────── */
   const handleCardClick = (serviceId: string) => {
     setSelectedServiceId(serviceId);
     navigateTo('service-detail');
   };
+
+  /* ── Selected wilaya display ────────────────────────────────────────── */
+  const selectedWilayaName = selectedWilaya
+    ? getWilayaName(selectedWilaya, locale)
+    : null;
 
   /* ═══════════════════════════════════════════════════════════════════════
      Render
@@ -214,10 +254,10 @@ export default function ServicesPage() {
           className="text-center mb-10"
         >
           <p className="text-xs text-purple-400 uppercase tracking-widest font-semibold mb-3">
-            {t('services')}
+            {t('allServices')}
           </p>
           <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black text-gradient-purple">
-            {locale === 'ar' ? 'جميع التجارب' : 'All Experiences'}
+            {locale === 'ar' ? 'جميع الخدمات الطبية' : 'All Medical Services'}
           </h1>
           <p className="text-muted-foreground mt-2 text-sm">{t('servicesSubtitle')}</p>
         </motion.div>
@@ -255,12 +295,161 @@ export default function ServicesPage() {
               className="btn-purple-gradient btn-shimmer px-6 py-2.5 rounded-xl text-sm font-semibold flex items-center gap-2"
             >
               <Search className="w-4 h-4" />
-              <span className="hidden sm:inline">{locale === 'ar' ? 'بحث' : 'Search'}</span>
+              <span className="hidden sm:inline">
+                {locale === 'ar' ? 'بحث' : 'Search'}
+              </span>
             </motion.button>
           </div>
         </motion.div>
 
-        {/* ═══ Filter Chips + Sort ═══ */}
+        {/* ═══ Wilaya Dropdown Filter ═══ */}
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.12 }}
+          className="mb-6"
+        >
+          <div className="flex items-center gap-3 flex-wrap">
+            <label className="text-xs text-muted-foreground font-medium flex items-center gap-1.5">
+              <MapPinned className="w-3.5 h-3.5 text-purple-400" />
+              {t('filterByWilaya')}
+            </label>
+
+            {/* Selected wilaya chip */}
+            {selectedWilayaName && (
+              <motion.span
+                initial={{ opacity: 0, scale: 0.9 }}
+                animate={{ opacity: 1, scale: 1 }}
+                exit={{ opacity: 0, scale: 0.9 }}
+                className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg btn-purple-gradient text-white text-xs font-semibold"
+              >
+                <MapPin className="w-3 h-3" />
+                {selectedWilayaName}
+                <button
+                  onClick={() => setSelectedWilaya(null)}
+                  className="hover:bg-white/20 rounded-full p-0.5 transition-colors"
+                >
+                  <X className="w-3 h-3" />
+                </button>
+              </motion.span>
+            )}
+
+            {/* Wilaya dropdown trigger + panel */}
+            <div className="relative" ref={wilayaDropdownRef}>
+              <motion.button
+                whileHover={{ scale: 1.03 }}
+                whileTap={{ scale: 0.97 }}
+                onClick={() => {
+                  setShowWilayaDropdown(!showWilayaDropdown);
+                  setWilayaSearch('');
+                }}
+                className={`flex items-center gap-2 px-4 py-2 rounded-xl glass border text-xs transition-all whitespace-nowrap ${
+                  showWilayaDropdown
+                    ? 'border-purple-500/40 text-purple-300'
+                    : 'border-purple-500/15 text-muted-foreground hover:text-purple-300 purple-glow-focus'
+                }`}
+              >
+                <MapPin className="w-3.5 h-3.5" />
+                <span>{selectedWilayaName ?? t('allWilayas')}</span>
+                {showWilayaDropdown
+                  ? <ChevronUp className="w-3.5 h-3.5" />
+                  : <ChevronDown className="w-3.5 h-3.5" />}
+              </motion.button>
+
+              <AnimatePresence>
+                {showWilayaDropdown && (
+                  <motion.div
+                    initial={{ opacity: 0, y: -8, scale: 0.95 }}
+                    animate={{ opacity: 1, y: 0, scale: 1 }}
+                    exit={{ opacity: 0, y: -8, scale: 0.95 }}
+                    transition={dropdownTransition}
+                    className={`absolute top-full ${isRTL ? 'left-0' : 'right-0'} mt-2 w-72 glass rounded-xl border border-purple-500/20 shadow-2xl z-30 overflow-hidden`}
+                  >
+                    {/* Search inside dropdown */}
+                    <div className="p-2 border-b border-purple-500/10">
+                      <div className="flex items-center gap-2 px-3 py-2 rounded-lg bg-purple-500/5 border border-purple-500/10">
+                        <Search className="w-3.5 h-3.5 text-purple-400 flex-shrink-0" />
+                        <input
+                          type="text"
+                          placeholder={locale === 'ar' ? 'ابحث عن ولاية...' : 'Search wilaya...'}
+                          value={wilayaSearch}
+                          onChange={(e) => setWilayaSearch(e.target.value)}
+                          autoFocus
+                          className="w-full bg-transparent text-xs text-foreground placeholder:text-muted-foreground focus:outline-none"
+                        />
+                        {wilayaSearch && (
+                          <button
+                            onClick={() => setWilayaSearch('')}
+                            className="text-muted-foreground hover:text-foreground transition-colors"
+                          >
+                            <X className="w-3 h-3" />
+                          </button>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Wilaya list */}
+                    <div className="max-h-64 overflow-y-auto scrollbar-none">
+                      {/* All wilayas option */}
+                      <button
+                        onClick={() => {
+                          setSelectedWilaya(null);
+                          setShowWilayaDropdown(false);
+                        }}
+                        className={`w-full text-${isRTL ? 'right' : 'left'} px-4 py-2.5 text-xs transition-all border-b border-purple-500/5 ${
+                          !selectedWilaya
+                            ? 'bg-purple-500/15 text-purple-300 font-semibold'
+                            : 'text-muted-foreground hover:text-purple-300 hover:bg-purple-500/5'
+                        }`}
+                      >
+                        {t('allWilayas')}
+                      </button>
+
+                      {filteredWilayas.map((wilaya) => {
+                        const isActive = selectedWilaya === wilaya.code;
+                        const displayName = locale === 'ar' ? wilaya.nameAr : wilaya.nameEn;
+                        return (
+                          <button
+                            key={wilaya.code}
+                            onClick={() => {
+                              setSelectedWilaya(isActive ? null : wilaya.code);
+                              setShowWilayaDropdown(false);
+                              setWilayaSearch('');
+                            }}
+                            className={`w-full text-${isRTL ? 'right' : 'left'} px-4 py-2.5 text-xs transition-all flex items-center justify-between ${
+                              isActive
+                                ? 'bg-purple-500/15 text-purple-300 font-semibold'
+                                : 'text-muted-foreground hover:text-purple-300 hover:bg-purple-500/5'
+                            }`}
+                          >
+                            <span className="flex items-center gap-2">
+                              <span className="w-5 text-center text-[10px] text-purple-400/60 font-mono">
+                                {wilaya.code}
+                              </span>
+                              {displayName}
+                            </span>
+                            {isActive && (
+                              <span className="text-purple-400 text-[10px]">✓</span>
+                            )}
+                          </button>
+                        );
+                      })}
+
+                      {filteredWilayas.length === 0 && (
+                        <div className="px-4 py-6 text-center text-xs text-muted-foreground">
+                          <MapPin className="w-6 h-6 mx-auto mb-2 text-purple-500/30" />
+                          {locale === 'ar' ? 'لم يتم العثور على ولاية' : 'No wilaya found'}
+                        </div>
+                      )}
+                    </div>
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </div>
+          </div>
+        </motion.div>
+
+        {/* ═══ Category Filter Chips + Sort ═══ */}
         <motion.div
           initial={{ opacity: 0, y: 20 }}
           animate={{ opacity: 1, y: 0 }}
@@ -275,7 +464,7 @@ export default function ServicesPage() {
               whileTap={{ scale: 0.95 }}
               onClick={clearFilters}
               className={`flex-shrink-0 px-5 py-2 rounded-xl text-xs font-semibold transition-all duration-300 whitespace-nowrap ${
-                !selectedCategoryId && !searchQuery
+                !selectedCategoryId && !selectedWilaya && !searchQuery
                   ? 'btn-purple-gradient text-white shadow-lg shadow-purple-500/25'
                   : 'glass border border-purple-500/15 text-muted-foreground glow-purple'
               }`}
@@ -285,7 +474,6 @@ export default function ServicesPage() {
 
             {/* Category chips */}
             {categories.map((cat) => {
-              const catKey = catKeys.includes(cat.icon as any) ? cat.icon : 'adventure';
               const name = locale === 'ar' ? cat.nameAr : cat.nameEn;
               const isActive = selectedCategoryId === cat.id;
               return (
@@ -300,7 +488,7 @@ export default function ServicesPage() {
                       : 'glass border border-purple-500/15 text-muted-foreground glow-purple'
                   }`}
                 >
-                  {categoryIconMap[catKey]}
+                  {getCategoryIcon(cat.icon)}
                   {name}
                 </motion.button>
               );
@@ -359,7 +547,7 @@ export default function ServicesPage() {
           className="flex items-center justify-between mb-6"
         >
           <p className="text-xs text-muted-foreground">
-            {services.length} {locale === 'ar' ? 'تجربة متاحة' : 'experiences available'}
+            {services.length} {locale === 'ar' ? 'خدمة طبية متاحة' : 'medical services available'}
           </p>
           {isFiltered && (
             <button
@@ -392,9 +580,10 @@ export default function ServicesPage() {
                   <div className="flex gap-3 pt-2">
                     <div className="h-8 bg-purple-500/5 rounded-lg w-20 animate-pulse" />
                     <div className="h-8 bg-purple-500/5 rounded-lg w-20 animate-pulse" />
+                    <div className="h-8 bg-purple-500/5 rounded-lg w-20 animate-pulse" />
                   </div>
                   <div className="pt-3 border-t border-purple-500/10 flex justify-between items-center">
-                    <div className="h-5 bg-purple-500/8 rounded-lg w-16 animate-pulse" />
+                    <div className="h-5 bg-purple-500/8 rounded-lg w-20 animate-pulse" />
                     <div className="h-8 bg-purple-500/8 rounded-lg w-28 animate-pulse" />
                   </div>
                 </div>
@@ -422,7 +611,7 @@ export default function ServicesPage() {
               onClick={clearFilters}
               className="btn-purple-gradient btn-shimmer px-6 py-2.5 rounded-xl text-sm font-semibold"
             >
-              {locale === 'ar' ? 'عرض جميع التجارب' : 'View all experiences'}
+              {locale === 'ar' ? 'عرض جميع الخدمات' : 'View all services'}
             </motion.button>
           </motion.div>
         ) : (
@@ -431,7 +620,7 @@ export default function ServicesPage() {
             variants={containerVariants}
             initial="hidden"
             animate="visible"
-            key={`${selectedCategoryId}-${searchQuery}-${sortBy}`}
+            key={`${selectedCategoryId}-${searchQuery}-${selectedWilaya}-${sortBy}`}
             className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6"
           >
             {services.map((service) => (
@@ -455,7 +644,9 @@ export default function ServicesPage() {
                           loading="lazy"
                         />
                       ) : (
-                        <div className="w-full h-full bg-gradient-to-br from-purple-500/20 to-purple-900/20" />
+                        <div className="w-full h-full bg-gradient-to-br from-purple-500/20 to-purple-900/20 flex items-center justify-center">
+                          <Stethoscope className="w-12 h-12 text-purple-500/20" />
+                        </div>
                       )}
 
                       {/* Gradient overlay */}
@@ -463,14 +654,14 @@ export default function ServicesPage() {
 
                       {/* Category badge (top-left) */}
                       <span className="absolute top-3 left-3 px-2.5 py-1 rounded-lg glass border border-purple-500/20 text-purple-300 text-[10px] font-bold uppercase tracking-wider flex items-center gap-1.5">
-                        {categoryIconMap[catKeys.includes(service.category.icon as any) ? service.category.icon : 'adventure']}
+                        {getCategoryIcon(service.category.icon)}
                         {locale === 'ar' ? service.category.nameAr : service.category.nameEn}
                       </span>
 
                       {/* Featured badge (top-right) */}
                       {service.featured && (
-                        <span className="absolute top-3 right-3 px-2.5 py-1 rounded-lg btn-gold-gradient text-white text-[10px] font-bold uppercase tracking-wider flex items-center gap-1">
-                          <Crown className="w-3 h-3" />
+                        <span className="absolute top-3 right-3 px-2.5 py-1 rounded-lg bg-gradient-to-r from-amber-500 to-yellow-500 text-white text-[10px] font-bold uppercase tracking-wider flex items-center gap-1 shadow-lg shadow-amber-500/25">
+                          <Star className="w-3 h-3 fill-current" />
                           {t('featured')}
                         </span>
                       )}
@@ -517,13 +708,13 @@ export default function ServicesPage() {
                             />
                           ))}
                         </div>
-                        <span className="text-xs font-semibold text-gold">{service.rating}</span>
+                        <span className="text-xs font-semibold text-yellow-400">{service.rating}</span>
                         <span className="text-[10px] text-muted-foreground">
                           ({service.totalReviews} {t('reviews')})
                         </span>
                       </div>
 
-                      {/* Duration / Location with purple icons */}
+                      {/* Duration / Wilaya / Max Sessions */}
                       <div className="flex items-center gap-4 mb-4 text-[11px] text-muted-foreground">
                         <span className="flex items-center gap-1.5">
                           <Clock className="w-3.5 h-3.5 text-purple-400" />
@@ -531,7 +722,7 @@ export default function ServicesPage() {
                         </span>
                         <span className="flex items-center gap-1.5">
                           <MapPin className="w-3.5 h-3.5 text-purple-400" />
-                          {service.location}
+                          {getWilayaName(service.wilaya, locale)}
                         </span>
                         <span className="flex items-center gap-1.5">
                           <Users className="w-3.5 h-3.5 text-purple-400" />
@@ -546,8 +737,8 @@ export default function ServicesPage() {
                       <div className="pt-3 border-t border-purple-500/10">
                         <div className="flex items-center justify-between mb-3">
                           <p className="text-2xl font-bold text-gradient-gold">
-                            {service.price}
-                            <span className="text-sm text-gold/60 ml-1">{t('sar')}</span>
+                            {service.price.toLocaleString(locale === 'ar' ? 'ar-DZ' : 'en-DZ')}
+                            <span className="text-sm text-yellow-500/60 ml-1">{t('dzd')}</span>
                           </p>
                           <span className="text-[10px] text-muted-foreground">{t('perPerson')}</span>
                         </div>

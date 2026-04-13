@@ -52,6 +52,10 @@ interface AppState {
   selectedCategoryId: string | null;
   setSelectedCategoryId: (id: string | null) => void;
 
+  // Selected wilaya for filtering
+  selectedWilaya: string | null;
+  setSelectedWilaya: (wilaya: string | null) => void;
+
   // Booking form
   bookingDate: string;
   setBookingDate: (date: string) => void;
@@ -121,6 +125,10 @@ export const useAppStore = create<AppState>((set, get) => ({
   // Selected category
   selectedCategoryId: null,
   setSelectedCategoryId: (id) => set({ selectedCategoryId: id }),
+
+  // Selected wilaya
+  selectedWilaya: null,
+  setSelectedWilaya: (wilaya) => set({ selectedWilaya: wilaya }),
 
   // Booking form
   bookingDate: '',

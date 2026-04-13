@@ -165,15 +165,15 @@ export default function Footer() {
               <div className="mt-6 space-y-3">
                 <div className="flex items-center gap-2.5 text-xs text-gray-400/70">
                   <MapPin className="w-3.5 h-3.5 text-purple-500 shrink-0" />
-                  <span>Riyadh, Saudi Arabia</span>
+                  <span>{isRTL ? 'الجزائر العاصمة، الجزائر' : 'Algiers, Algeria'}</span>
                 </div>
                 <div className="flex items-center gap-2.5 text-xs text-gray-400/70">
                   <Phone className="w-3.5 h-3.5 text-purple-500 shrink-0" />
-                  <span dir="ltr">+966 50 000 0000</span>
+                  <span dir="ltr">+213 555 000 000</span>
                 </div>
                 <div className="flex items-center gap-2.5 text-xs text-gray-400/70">
                   <Mail className="w-3.5 h-3.5 text-purple-500 shrink-0" />
-                  <span>hello@h-tourism.com</span>
+                  <span>contact@h-medical.dz</span>
                 </div>
               </div>
             </motion.div>
@@ -191,7 +191,7 @@ export default function Footer() {
                 {t('newsletter')}
               </h3>
               <p className="text-xs text-gray-400/70 mb-5 leading-relaxed">
-                Get the latest travel deals & updates delivered to your inbox.
+                {isRTL ? 'احصل على آخر العروض الطبية والتحديثات مباشرة في بريدك' : 'Get the latest medical deals & health updates delivered to your inbox.'}
               </p>
               <div className="purple-glow-focus rounded-xl">
                 <div className="flex gap-2">
@@ -235,8 +235,7 @@ export default function Footer() {
             &copy; {new Date().getFullYear()} H. {t('copyright')}
           </p>
           <p className="text-xs text-purple-400/25 flex items-center gap-1">
-            Crafted with <Heart className="w-3 h-3 text-purple-500/60" /> luxury
-            in mind
+            {isRTL ? 'صُمم بكل' : 'Crafted with'} <Heart className="w-3 h-3 text-purple-500/60" /> {isRTL ? '❤️ في الجزائر' : '❤️ in Algeria'}
           </p>
         </div>
       </div>

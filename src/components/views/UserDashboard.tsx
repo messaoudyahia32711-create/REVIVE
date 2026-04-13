@@ -191,7 +191,7 @@ export default function UserDashboard() {
     {
       label: locale === 'ar' ? 'إجمالي الإنفاق' : 'Total Spent', icon: CreditCard, color: 'text-gold',
       gradient: 'bg-gradient-to-br from-gold-dark to-gold',
-      value: `${bookings.reduce((s, b) => s + b.totalPrice, 0).toLocaleString()} ${t('sar')}`, isText: true,
+      value: `${bookings.reduce((s, b) => s + b.totalPrice, 0).toLocaleString()} ${t('dzd')}`, isText: true,
     },
     {
       label: locale === 'ar' ? 'القادمة' : 'Upcoming', icon: TrendingUp, color: 'text-emerald-400',
@@ -451,7 +451,7 @@ export default function UserDashboard() {
 
                             <div className="flex items-center justify-between pt-3 border-t border-purple-500/10">
                               <p className="text-lg font-black text-gradient-gold">
-                                {booking.totalPrice.toLocaleString()} <span className="text-xs text-gold/60">{t('sar')}</span>
+                                {booking.totalPrice.toLocaleString()} <span className="text-xs text-gold/60">{t('dzd')}</span>
                               </p>
                               <div className="flex gap-2">
                                 <motion.button

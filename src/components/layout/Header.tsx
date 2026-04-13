@@ -4,10 +4,10 @@ import { useState, useEffect, useCallback } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   Globe, Menu, User, LogOut, LayoutDashboard,
-  ChevronDown, ChevronUp, Compass,
+  ChevronDown, ChevronUp,
   Facebook, Twitter, Instagram, Youtube, Send,
-  Mail, Heart, Mountain, Building2, Waves, Fish, Ship,
-  Palmtree
+  Mail, Heart,
+  HeartPulse, Smile, Activity, Sparkles, Eye, Leaf, Stethoscope,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import {
@@ -41,19 +41,22 @@ import Image from 'next/image';
 
 /* ── Dynamic Icon Map ──────────────────────────────────────────────────────── */
 const iconMap: Record<string, React.ReactNode> = {
-  Mountain: <Mountain className="w-5 h-5" />,
-  Building2: <Building2 className="w-5 h-5" />,
-  Waves: <Waves className="w-5 h-5" />,
-  Fish: <Fish className="w-5 h-5" />,
-  Compass: <Compass className="w-5 h-5" />,
-  Ship: <Ship className="w-5 h-5" />,
-  Palmtree: <Palmtree className="w-5 h-5" />,
-  adventure: <Mountain className="w-5 h-5" />,
-  city: <Building2 className="w-5 h-5" />,
-  beach: <Waves className="w-5 h-5" />,
-  diving: <Fish className="w-5 h-5" />,
-  desert: <Compass className="w-5 h-5" />,
-  cruise: <Ship className="w-5 h-5" />,
+  Stethoscope: <Stethoscope className="w-5 h-5" />,
+  Smile: <Smile className="w-5 h-5" />,
+  Activity: <Activity className="w-5 h-5" />,
+  Sparkles: <Sparkles className="w-5 h-5" />,
+  Eye: <Eye className="w-5 h-5" />,
+  Leaf: <Leaf className="w-5 h-5" />,
+  HeartPulse: <HeartPulse className="w-5 h-5" />,
+  medical: <Stethoscope className="w-5 h-5" />,
+  dental: <Smile className="w-5 h-5" />,
+  physio: <Activity className="w-5 h-5" />,
+  skin: <Sparkles className="w-5 h-5" />,
+  eye: <Eye className="w-5 h-5" />,
+  alt: <Leaf className="w-5 h-5" />,
+  heart: <HeartPulse className="w-5 h-5" />,
+  bone: <Stethoscope className="w-5 h-5" />,
+  nutrition: <HeartPulse className="w-5 h-5" />,
 };
 
 interface Category {
@@ -156,7 +159,7 @@ export default function Header() {
   );
 
   const getCatIcon = useCallback((iconStr: string) => {
-    return iconMap[iconStr] || <Compass className="w-5 h-5" />;
+    return iconMap[iconStr] || <Stethoscope className="w-5 h-5" />;
   }, []);
 
   const isActive = useCallback(
@@ -447,7 +450,7 @@ export default function Header() {
                       : 'text-gray-400 hover:text-purple-300 hover:bg-purple-500/5 border border-transparent'
                   }`}
                 >
-                  <Compass className="w-5 h-5" />
+                  <Stethoscope className="w-5 h-5" />
                   <span>{t('home')}</span>
                   {isActive('home') && (
                     <motion.span
@@ -468,7 +471,7 @@ export default function Header() {
                             : 'text-gray-400 hover:text-purple-300 hover:bg-purple-500/5 border border-transparent'
                         }`}
                       >
-                        <Heart className="w-5 h-5" />
+                        <HeartPulse className="w-5 h-5" />
                         <span>{t('services')}</span>
                         <motion.span
                           animate={{ rotate: mobileCatOpen ? 180 : 0 }}

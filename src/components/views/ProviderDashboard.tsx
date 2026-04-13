@@ -474,7 +474,7 @@ export default function ProviderDashboard() {
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
           <StatCard icon={CalendarCheck} label={t('totalBookings')} value={stats.totalBookings}
             gradient="bg-gradient-to-br from-teal-500 to-teal-700" />
-          <StatCard icon={DollarSign} label={t('totalRevenue')} value={stats.totalRevenue} suffix={t('sar')}
+          <StatCard icon={DollarSign} label={t('totalRevenue')} value={stats.totalRevenue} suffix={t('dzd')}
             gradient="bg-gradient-to-br from-gold-dark to-gold" isGold />
           <StatCard icon={Package} label={t('totalServices')} value={stats.totalServices}
             gradient="bg-gradient-to-br from-emerald-500 to-emerald-700" />
@@ -506,7 +506,7 @@ export default function ProviderDashboard() {
                   <Tooltip
                     contentStyle={{ borderRadius: '16px', border: '1px solid rgba(139,92,246,0.2)',
                       boxShadow: '0 8px 32px rgba(0,0,0,0.3)', backdropFilter: 'blur(16px)', background: 'rgba(10,10,15,0.95)' }}
-                    formatter={(value: number) => [`${value.toLocaleString()} ${t('sar')}`, t('totalRevenue')]}
+                    formatter={(value: number) => [`${value.toLocaleString()} ${t('dzd')}`, t('totalRevenue')]}
                     cursor={{ fill: 'rgba(139,92,246,0.06)' }}
                   />
                   <Bar dataKey="revenue" fill="url(#purpleBarGrad)" radius={[8, 8, 0, 0]} maxBarSize={48} />
@@ -552,7 +552,7 @@ export default function ProviderDashboard() {
                             <Star className="h-3.5 w-3.5 fill-current" />
                             <span className="text-xs font-bold">{service.rating.toFixed(1)}</span>
                           </div>
-                          <span className="text-xs font-bold text-gradient-gold">{service.price} {t('sar')}</span>
+                          <span className="text-xs font-bold text-gradient-gold">{service.price} {t('dzd')}</span>
                         </div>
                       </div>
                     </div>
@@ -613,7 +613,7 @@ export default function ProviderDashboard() {
                   <MapPin className="w-3 h-3 text-purple-400" /> {svc.location}
                 </p>
                 <div className="flex items-center justify-between mb-3">
-                  <span className="text-lg font-black text-gradient-gold">{svc.price} <span className="text-xs text-gold/60">{t('sar')}</span></span>
+                  <span className="text-lg font-black text-gradient-gold">{svc.price} <span className="text-xs text-gold/60">{t('dzd')}</span></span>
                   <div className="flex items-center gap-1 text-gold star-filled">
                     <Star className="h-3.5 w-3.5 fill-current" />
                     <span className="text-xs font-bold">{svc.rating.toFixed(1)}</span>
@@ -700,7 +700,7 @@ export default function ProviderDashboard() {
                 </Select>
               </div>
               <div className="space-y-2">
-                <Label className="text-xs font-semibold uppercase tracking-wider text-purple-300">{t('servicePrice')} ({t('sar')})</Label>
+                <Label className="text-xs font-semibold uppercase tracking-wider text-purple-300">{t('servicePrice')} ({t('dzd')})</Label>
                 <Input type="number" value={serviceForm.price} onChange={(e) => setServiceForm({ ...serviceForm, price: e.target.value })}
                   placeholder="0" className="bg-purple-500/5 border-purple-500/15 text-white focus-visible:ring-purple-500/30" />
               </div>
@@ -815,7 +815,7 @@ export default function ProviderDashboard() {
                     <span className="flex items-center gap-1"><Users className="w-3 h-3 text-purple-400" /> {b.numberOfPeople}</span>
                   </div>
                   <div className="flex items-center justify-between pt-3 border-t border-purple-500/10">
-                    <p className="text-lg font-black text-gradient-gold">{b.totalPrice.toLocaleString()} <span className="text-xs text-gold/60">{t('sar')}</span></p>
+                    <p className="text-lg font-black text-gradient-gold">{b.totalPrice.toLocaleString()} <span className="text-xs text-gold/60">{t('dzd')}</span></p>
                     <div className="flex gap-2">
                       {b.status === 'pending' && (
                         <>

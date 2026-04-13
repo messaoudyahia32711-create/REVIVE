@@ -4,9 +4,10 @@ import { useState, useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import {
   User, Briefcase, Mail, Lock, Eye, EyeOff, Phone,
-  ArrowRight, Crown, Sparkles, MapPin
+  ArrowRight, Crown, Sparkles, MapPin, ChevronDown
 } from 'lucide-react';
 import { useAppStore } from '@/lib/store';
+import { WILAYAS } from '@/lib/wilayas';
 
 /* ═══════════════════════════════════════════════════════════════════════════
    Animation Variants
@@ -62,6 +63,9 @@ export default function AuthPage() {
   const [companyName, setCompanyName] = useState('');
   const [companyDesc, setCompanyDesc] = useState('');
   const [companyLocation, setCompanyLocation] = useState('');
+  const [wilaya, setWilaya] = useState('');
+  const [showWilayaDropdown, setShowWilayaDropdown] = useState(false);
+  const [wilayaSearch, setWilayaSearch] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
@@ -79,6 +83,7 @@ export default function AuthPage() {
     setCompanyName('');
     setCompanyDesc('');
     setCompanyLocation('');
+    setWilaya('');
     setShowPassword(false);
   }, [currentPage]);
 
@@ -142,6 +147,7 @@ export default function AuthPage() {
             companyName: role === 'provider' ? companyName : undefined,
             description: role === 'provider' ? companyDesc : undefined,
             location: role === 'provider' ? companyLocation : undefined,
+            wilaya: wilaya || undefined,
           };
 
       const res = await fetch('/api/auth', {
@@ -356,8 +362,79 @@ export default function AuthPage() {
                       </div>
                     </motion.div>
 
-                    {/* Password */}
+                    {/* Wilaya Dropdown */}
                     <motion.div custom={3} variants={fieldVariants} initial="hidden" animate="visible">
+                      <label className="text-xs text-muted-foreground mb-1.5 block font-medium">
+                        {t('wilaya')}{' '}
+                        <span className="text-[10px] text-muted-foreground/60">
+                          ({locale === 'ar' ? 'اختياري' : 'optional'})
+                        </span>
+                      </label>
+                      <div className="relative">
+                        <motion.button
+                          whileTap={{ scale: 0.98 }}
+                          type="button"
+                          onClick={() => setShowWilayaDropdown(!showWilayaDropdown)}
+                          className="w-full bg-purple-500/5 border border-purple-500/15 rounded-xl pe-4 py-3 text-sm text-foreground focus:outline-none focus:border-purple-500/50 transition-all duration-300 ps-10 text-start flex items-center justify-between"
+                        >
+                          <MapPin className="absolute start-3 top-1/2 -translate-y-1/2 w-4 h-4 text-muted-foreground pointer-events-none" />
+                          <span className={wilaya ? 'text-foreground' : 'text-muted-foreground'}>
+                            {wilaya
+                              ? (locale === 'ar'
+                                ? WILAYAS.find(w => w.code === wilaya)?.nameAr
+                                : WILAYAS.find(w => w.code === wilaya)?.nameEn)
+                              : (locale === 'ar' ? 'اختر ولايتك' : 'Select your wilaya')}
+                          </span>
+                          <ChevronDown className={`w-4 h-4 text-muted-foreground transition-transform duration-300 ${showWilayaDropdown ? 'rotate-180' : ''}`} />
+                        </motion.button>
+                        <AnimatePresence>
+                          {showWilayaDropdown && (
+                            <motion.div
+                              initial={{ opacity: 0, y: -8, scale: 0.95 }}
+                              animate={{ opacity: 1, y: 0, scale: 1 }}
+                              exit={{ opacity: 0, y: -8, scale: 0.95 }}
+                              transition={{ duration: 0.2 }}
+                              className={`absolute top-full ${isRTL ? 'left-0' : 'right-0'} mt-2 w-full glass rounded-xl border border-purple-500/20 shadow-2xl z-30 overflow-hidden`}
+                            >
+                              <div className="p-2">
+                                <input
+                                  type="text"
+                                  value={wilayaSearch}
+                                  onChange={(e) => setWilayaSearch(e.target.value)}
+                                  placeholder={locale === 'ar' ? 'ابحث عن ولاية...' : 'Search wilaya...'}
+                                  className="w-full bg-purple-500/5 border border-purple-500/10 rounded-lg px-3 py-2 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:border-purple-500/30 mb-1"
+                                />
+                              </div>
+                              <div className="max-h-48 overflow-y-auto scrollbar-none">
+                                {WILAYAS.filter(w =>
+                                  !wilayaSearch ||
+                                  w.nameAr.includes(wilayaSearch) ||
+                                  w.nameEn.toLowerCase().includes(wilayaSearch.toLowerCase()) ||
+                                  w.code.includes(wilayaSearch)
+                                ).map(w => (
+                                  <button
+                                    key={w.code}
+                                    type="button"
+                                    onClick={() => { setWilaya(w.code); setShowWilayaDropdown(false); setWilayaSearch(''); }}
+                                    className={`w-full text-start px-4 py-2 text-xs transition-all flex items-center gap-2 ${
+                                      wilaya === w.code
+                                        ? 'bg-purple-500/15 text-purple-300 font-semibold'
+                                        : 'text-muted-foreground hover:text-purple-300 hover:bg-purple-500/5'
+                                    }`}
+                                  >
+                                    <span className="text-[10px] text-muted-foreground w-6">{w.code}</span>
+                                    <span>{locale === 'ar' ? w.nameAr : w.nameEn}</span>
+                                  </button>
+                                ))}
+                              </div>
+                            </motion.div>
+                          )}
+                        </AnimatePresence>
+                      </div>
+                    </motion.div>
+
+                    {/* Password */}
+                    <motion.div custom={4} variants={fieldVariants} initial="hidden" animate="visible">
                       <label className="text-xs text-muted-foreground mb-1.5 block font-medium">
                         {t('password')} <span className="text-purple-400">*</span>
                       </label>
@@ -382,7 +459,7 @@ export default function AuthPage() {
                     </motion.div>
 
                     {/* Confirm Password */}
-                    <motion.div custom={4} variants={fieldVariants} initial="hidden" animate="visible">
+                    <motion.div custom={5} variants={fieldVariants} initial="hidden" animate="visible">
                       <label className="text-xs text-muted-foreground mb-1.5 block font-medium">
                         {t('confirmPassword')} <span className="text-purple-400">*</span>
                       </label>

@@ -3,7 +3,7 @@ import { PrismaClient } from "@prisma/client";
 const prisma = new PrismaClient();
 
 async function main() {
-  console.log("🌱 Seeding database...\n");
+  console.log("🌱 Seeding medical tourism database...\n");
 
   // Clean existing data (in reverse dependency order)
   await prisma.message.deleteMany();
@@ -15,55 +15,55 @@ async function main() {
   await prisma.user.deleteMany();
 
   // ─────────────────────────────────────────────
-  // 1. USERS (4 total: 2 providers + 2 regular)
+  // 1. USERS (4 total: 2 patients + 2 providers)
   // ─────────────────────────────────────────────
   console.log("👤 Creating users...");
 
   const provider1User = await prisma.user.create({
     data: {
-      email: "ahmed@sahara-adventures.sa",
-      name: "أحمد السفاري",
-      password: "password123",
+      email: "provider1@h.dz",
+      name: "Dr. Karim Hadj",
+      password: "123456",
       role: "provider",
-      avatar: "/images/avatar-ahmed.png",
-      phone: "+966501234567",
+      phone: "+213555100001",
+      wilaya: "16",
       locale: "ar",
     },
   });
 
   const provider2User = await prisma.user.create({
     data: {
-      email: "sarah@blue-ocean.sa",
-      name: "سارة البحر",
-      password: "password123",
+      email: "provider2@h.dz",
+      name: "Dr. Samira Mebarki",
+      password: "123456",
       role: "provider",
-      avatar: "/images/avatar-sarah.png",
-      phone: "+966507654321",
+      phone: "+213555100002",
+      wilaya: "25",
       locale: "ar",
     },
   });
 
-  const user1 = await prisma.user.create({
+  const patient1 = await prisma.user.create({
     data: {
-      email: "mohamed@example.com",
-      name: "محمد أحمد",
-      password: "password123",
+      email: "patient1@h.dz",
+      name: "Ahmed Benali",
+      password: "123456",
       role: "user",
-      avatar: "/images/avatar-mohamed.png",
-      phone: "+966509876543",
+      phone: "+213555200001",
+      wilaya: "16",
       locale: "ar",
     },
   });
 
-  const user2 = await prisma.user.create({
+  const patient2 = await prisma.user.create({
     data: {
-      email: "john.smith@example.com",
-      name: "John Smith",
-      password: "password123",
+      email: "patient2@h.dz",
+      name: "Fatima Zohra Boualem",
+      password: "123456",
       role: "user",
-      avatar: "/images/avatar-john.png",
-      phone: "+14155551234",
-      locale: "en",
+      phone: "+213555200002",
+      wilaya: "31",
+      locale: "ar",
     },
   });
 
@@ -72,18 +72,18 @@ async function main() {
   // ─────────────────────────────────────────────
   // 2. PROVIDERS (2 total)
   // ─────────────────────────────────────────────
-  console.log("🏢 Creating providers...");
+  console.log("🏥 Creating providers...");
 
   const provider1 = await prisma.provider.create({
     data: {
       userId: provider1User.id,
-      companyName: "مغامرات الصحراء",
+      companyName: "مركز الصحة الطبيعي",
       description:
-        "نقدم أفضل تجارب السفاري الصحراوية في المملكة العربية السعودية. خبرة تزيد عن 15 عاماً في تنظيم رحلات السفاري والمغامرات الصحراوية. نحرص على تقديم تجربة آمنة وممتعة لجميع عملائنا.",
-      location: "الرياض، المملكة العربية السعودية",
-      website: "https://sahara-adventures.sa",
+        "مركز متخصص في تقديم خدمات الرعاية الصحية الشاملة والعلاج الطبيعي في الجزائر العاصمة. نضم فريقاً من الأطباء المتخصصين ذوي الخبرة العالية في مختلف المجالات الطبية. نسعى لتقديم أفضل تجربة علاجية لمرضانا بأحدث التقنيات والمعدات الطبية.",
+      wilaya: "16",
+      website: "https://natural-health.dz",
       rating: 4.8,
-      totalReviews: 247,
+      totalReviews: 45,
       verified: true,
     },
   });
@@ -91,13 +91,13 @@ async function main() {
   const provider2 = await prisma.provider.create({
     data: {
       userId: provider2User.id,
-      companyName: "جولات المحيط الأزرق",
+      companyName: "عيادة الشفاء",
       description:
-        "متخصصون في الرياضات المائية والجولات البحرية على ساحل البحر الأحمر. نقدم تجارب غوص وركوب أمواج واستكشاف الشعاب المرجانية بأعلى معايير السلامة.",
-      location: "جدة، المملكة العربية السعودية",
-      website: "https://blue-ocean-tours.sa",
-      rating: 4.6,
-      totalReviews: 183,
+        "عيادة طبية متقدمة في مدينة قسنطينة تقدم خدمات طبية متنوعة تشمل الجلدية والعيون وأمراض القلب. نفتخر بفريق طبي متميز وبمعدات حديثة لضمان تشخيص دقيق وعلاج فعّال. نحرص على راحة المريض وتوفير بيئة علاجية مريحة وآمنة.",
+      wilaya: "25",
+      website: "https://al-shifa-clinic.dz",
+      rating: 4.9,
+      totalReviews: 32,
       verified: true,
     },
   });
@@ -105,302 +105,308 @@ async function main() {
   console.log(`  ✓ Created 2 providers\n`);
 
   // ─────────────────────────────────────────────
-  // 3. CATEGORIES (6 total)
+  // 3. CATEGORIES (9 total)
   // ─────────────────────────────────────────────
   console.log("📂 Creating categories...");
 
   const categories = await Promise.all([
     prisma.category.create({
       data: {
-        nameAr: "رحلات السفاري",
-        nameEn: "Desert Safari",
-        icon: "compass",
-        image: "/images/category-desert.png",
+        nameAr: "الطب العام",
+        nameEn: "General Medicine",
+        icon: "Stethoscope",
         sort: 1,
       },
     }),
     prisma.category.create({
       data: {
-        nameAr: "جولات المدينة",
-        nameEn: "City Tours",
-        icon: "building",
-        image: "/images/category-city.png",
+        nameAr: "طب الأسنان",
+        nameEn: "Dental Care",
+        icon: "Smile",
         sort: 2,
       },
     }),
     prisma.category.create({
       data: {
-        nameAr: "منتجعات الشاطئ",
-        nameEn: "Beach Resort",
-        icon: "umbrella",
-        image: "/images/category-beach.png",
+        nameAr: "العلاج الطبيعي",
+        nameEn: "Physiotherapy",
+        icon: "Activity",
         sort: 3,
       },
     }),
     prisma.category.create({
       data: {
-        nameAr: "الغطس والرياضات المائية",
-        nameEn: "Diving & Water Sports",
-        icon: "fish",
-        image: "/images/category-diving.png",
+        nameAr: "طب الجلدية",
+        nameEn: "Dermatology",
+        icon: "Sparkles",
         sort: 4,
       },
     }),
     prisma.category.create({
       data: {
-        nameAr: "رحلات المغامرة",
-        nameEn: "Adventure Tours",
-        icon: "mountain",
-        image: "/images/category-adventure.png",
+        nameAr: "طب العيون",
+        nameEn: "Ophthalmology",
+        icon: "Eye",
         sort: 5,
       },
     }),
     prisma.category.create({
       data: {
-        nameAr: "الرحلات البحرية",
-        nameEn: "Cruises",
-        icon: "ship",
-        image: "/images/category-cruise.png",
+        nameAr: "الطب البديل",
+        nameEn: "Alternative Medicine",
+        icon: "Leaf",
         sort: 6,
+      },
+    }),
+    prisma.category.create({
+      data: {
+        nameAr: "أمراض القلب",
+        nameEn: "Cardiology",
+        icon: "HeartPulse",
+        sort: 7,
+      },
+    }),
+    prisma.category.create({
+      data: {
+        nameAr: "جراحة العظام",
+        nameEn: "Orthopedics",
+        icon: "Bone",
+        sort: 8,
+      },
+    }),
+    prisma.category.create({
+      data: {
+        nameAr: "التغذية والحمية",
+        nameEn: "Nutrition & Diet",
+        icon: "Apple",
+        sort: 9,
       },
     }),
   ]);
 
   const [
-    categoryDesert,
-    categoryCity,
-    categoryBeach,
-    categoryDiving,
-    categoryAdventure,
-    categoryCruise,
+    catGeneralMedicine,
+    catDentalCare,
+    catPhysiotherapy,
+    catDermatology,
+    catOphthalmology,
+    catAlternativeMedicine,
+    catCardiology,
+    catOrthopedics,
+    catNutrition,
   ] = categories;
 
-  console.log(`  ✓ Created 6 categories\n`);
+  console.log(`  ✓ Created 9 categories\n`);
 
   // ─────────────────────────────────────────────
   // 4. SERVICES (8 total)
   // ─────────────────────────────────────────────
-  console.log("🎯 Creating services...");
+  console.log("🩺 Creating services...");
 
   const services = await Promise.all([
-    // Service 1: Royal Desert Safari (Provider 1, Desert)
+    // Service 1: Comprehensive Medical Checkup (Provider 1, General Medicine)
     prisma.service.create({
       data: {
         providerId: provider1.id,
-        categoryId: categoryDesert.id,
-        titleAr: "جولة السفاري الصحراوية الملكية",
-        titleEn: "Royal Desert Safari Tour",
+        categoryId: catGeneralMedicine.id,
+        titleAr: "فحص طبي شامل",
+        titleEn: "Comprehensive Medical Checkup",
         descriptionAr:
-          "استمتع بتجربة سفاري فاخرة في قلب صحراء الربع الخالي. تتضمن الرحلة القيادة على الكثبان الرملية، ركوب الإبل، مشاهدة الغروب الصحراوي الساحر، وعشاء تقليدي تحت النجوم في خيمة بدوية فاخرة. تشمل الرحلة نقل ذهاباً وإياباً من فندقك، مشروبات لا محدودة، ووجبة عربية تقليدية.",
+          "فحص طبي شامل يتضمن تحاليل دم كاملة، قياس ضغط الدم والسكر، فحص القلب والأوعية الدموية، وتقييم الصحة العامة. يتم إجراء الفحص بواسطة فريق من الأطباء المتخصصين باستخدام أحدث المعدات الطبية. يحصل المريض على تقرير مفصل مع التوصيات العلاجية المناسبة.",
         descriptionEn:
-          "Experience a luxury desert safari in the heart of the Rub' al Khali desert. The tour includes dune bashing, camel riding, stunning desert sunset viewing, and a traditional dinner under the stars in a luxury Bedouin tent. Includes round-trip hotel transfer, unlimited beverages, and a traditional Arabian meal.",
-        price: 450,
-        currency: "SAR",
-        duration: "6 hours",
-        maxPeople: 6,
-        location: "صحراء الربع الخالي، الرياض",
-        image: "/images/service-safari.png",
-        images: JSON.stringify([
-          "/images/service-safari.png",
-          "/images/hero-desert.png",
-        ]),
+          "A comprehensive medical checkup including complete blood tests, blood pressure and sugar monitoring, cardiovascular examination, and overall health assessment. The examination is conducted by a team of specialized doctors using state-of-the-art medical equipment. Patients receive a detailed report with appropriate treatment recommendations.",
+        price: 8000,
+        currency: "DZD",
+        duration: "2 hours",
+        maxPeople: 1,
+        wilaya: "16",
+        location: "الجزائر",
+        images: JSON.stringify([]),
+        rating: 4.7,
+        totalReviews: 38,
+        totalBookings: 120,
+        active: true,
+        featured: true,
+      },
+    }),
+
+    // Service 2: Laser Teeth Whitening (Provider 1, Dental Care)
+    prisma.service.create({
+      data: {
+        providerId: provider1.id,
+        categoryId: catDentalCare.id,
+        titleAr: "تبييض أسنان بالليزر",
+        titleEn: "Laser Teeth Whitening",
+        descriptionAr:
+          "تقنية تبييض الأسنان بالليزر الأحدث لتحقيق أسنان بيضاء ناصعة في جلسة واحدة. يستخدم أطباؤنا أجهزة ليزر متطورة مع مواد تبييض آمنة ومعتمدة عالمياً. النتائج تظهر فوراً وتدوم لعدة أشهر مع العناية المناسبة.",
+        descriptionEn:
+          "The latest laser teeth whitening technology to achieve bright white teeth in a single session. Our doctors use advanced laser devices with globally approved safe whitening materials. Results are immediately visible and last for several months with proper care.",
+        price: 15000,
+        currency: "DZD",
+        duration: "1 hour",
+        maxPeople: 1,
+        wilaya: "16",
+        location: "الجزائر",
+        images: JSON.stringify([]),
         rating: 4.9,
-        totalReviews: 128,
-        totalBookings: 356,
+        totalReviews: 52,
+        totalBookings: 95,
         active: true,
         featured: true,
       },
     }),
 
-    // Service 2: Desert Camp Under Stars (Provider 1, Desert)
+    // Service 3: Physiotherapy Session (Provider 1, Physiotherapy)
     prisma.service.create({
       data: {
         providerId: provider1.id,
-        categoryId: categoryDesert.id,
-        titleAr: "مخيم الصحراء تحت النجوم",
-        titleEn: "Desert Camp Under Stars",
+        categoryId: catPhysiotherapy.id,
+        titleAr: "جلسة علاج طبيعي",
+        titleEn: "Physiotherapy Session",
         descriptionAr:
-          "قضاء ليلة لا تُنسى في مخيم صحراوي فاخر. يتضمن البرنامج عشاء بدوي أصيل، شوي لحم، شاي عربي، وعروض موسيقية تقليدية. توفر الخيام فراشاً مريحاً ومرافق صحية حديثة. تجربة مثالية للعائلات والأصدقاء الباحثين عن الهدوء والسكون تحت سماء الصحراء الصافية.",
+          "جلسة علاج طبيعي متخصصة لعلاج آلام الظهر والرقبة والمفاصل باستخدام أحدث التقنيات. يتضمن العلاج تمارين مخصصة وتحفيز كهربائي وعلاج بالحرارة والتدليك. يضع أخصائي العلاج الطبيعي خطة علاجية تناسب حالة كل مريض.",
         descriptionEn:
-          "Spend an unforgettable night in a luxury desert camp. The program includes an authentic Bedouin dinner, BBQ, Arabic coffee, and traditional music performances. Tents provide comfortable bedding and modern restroom facilities. A perfect experience for families and friends seeking tranquility under the clear desert sky.",
-        price: 800,
-        currency: "SAR",
-        duration: "2 days",
-        maxPeople: 10,
-        location: "صحراء النفود، حائل",
-        image: "/images/hero-desert.png",
-        images: JSON.stringify([
-          "/images/hero-desert.png",
-          "/images/service-safari.png",
-        ]),
-        rating: 4.7,
-        totalReviews: 89,
-        totalBookings: 213,
-        active: true,
-        featured: true,
-      },
-    }),
-
-    // Service 3: Old City Tour (Provider 1, City)
-    prisma.service.create({
-      data: {
-        providerId: provider1.id,
-        categoryId: categoryCity.id,
-        titleAr: "جولة المدينة القديمة",
-        titleEn: "Old City Tour",
-        descriptionAr:
-          "اكتشف التاريخ العريق لمنطقة الدرعية التاريخية في الرياض. جولة ممشى مع مرشد سياحي متخصص يأخذك في رحلة عبر المباني التراثية والمتاحف والأسواق التقليدية. تعرف على ثقافة السعودية الأصيلة واستمتع بالمأكولات الشعبية في المطاعم التراثية.",
-        descriptionEn:
-          "Discover the rich history of the historic Diriyah area in Riyadh. A guided walking tour with a specialized guide that takes you through heritage buildings, museums, and traditional markets. Learn about authentic Saudi culture and enjoy traditional cuisine at heritage restaurants.",
-        price: 200,
-        currency: "SAR",
-        duration: "4 hours",
-        maxPeople: 15,
-        location: "الدرعية التاريخية، الرياض",
-        image: "/images/service-riad.png",
-        images: JSON.stringify(["/images/service-riad.png"]),
-        rating: 4.5,
-        totalReviews: 64,
-        totalBookings: 178,
-        active: true,
-        featured: false,
-      },
-    }),
-
-    // Service 4: Luxury Beach Vacation (Provider 2, Beach)
-    prisma.service.create({
-      data: {
-        providerId: provider2.id,
-        categoryId: categoryBeach.id,
-        titleAr: "إجازة الشاطئ الفاخرة",
-        titleEn: "Luxury Beach Vacation",
-        descriptionAr:
-          "استرخِ على شواطئ البحر الأحمر الخلابة في منتجع فاخر. تشمل الرحلة إقامة في جناح مطلة على البحر، وجبات بحرية طازجة، واستخدام مرافق المنتجع بما في ذلك المسابح والسبا. مثالية للأزواج والعائلات الباحثين عن الاسترخاء والرفاهية.",
-        descriptionEn:
-          "Relax on the stunning Red Sea beaches at a luxury resort. The trip includes a stay in a sea-view suite, fresh seafood meals, and full access to resort facilities including pools and spa. Ideal for couples and families seeking relaxation and luxury.",
-        price: 2500,
-        currency: "SAR",
-        duration: "3 days",
-        maxPeople: 4,
-        location: "شاطئ أوبهور، جدة",
-        image: "/images/category-beach.png",
-        images: JSON.stringify([
-          "/images/category-beach.png",
-          "/images/service-yacht.png",
-        ]),
-        rating: 4.8,
-        totalReviews: 95,
-        totalBookings: 267,
-        active: true,
-        featured: true,
-      },
-    }),
-
-    // Service 5: Coral Reef Diving (Provider 2, Diving)
-    prisma.service.create({
-      data: {
-        providerId: provider2.id,
-        categoryId: categoryDiving.id,
-        titleAr: "غوص الشعاب المرجانية",
-        titleEn: "Coral Reef Diving",
-        descriptionAr:
-          "استكشف عالم الشعاب المرجانية المذهل في البحر الأحمر. رحلة غوص مصحوبة بمدربين معتمدين دولياً من PADI. مناسبة لجميع المستويات من المبتدئين إلى المحترفين. يتضمن البرنامج معدات الغوص الكاملة، نقل بالقارب، وجبات خفيفة. اكتشف أكثر من 200 نوع من الأسماك المرجانية الملونة.",
-        descriptionEn:
-          "Explore the amazing world of coral reefs in the Red Sea. A diving trip accompanied by PADI internationally certified instructors. Suitable for all levels from beginners to professionals. The program includes full diving equipment, boat transfer, and snacks. Discover over 200 species of colorful reef fish.",
-        price: 650,
-        currency: "SAR",
-        duration: "5 hours",
-        maxPeople: 8,
-        location: "شعاب الشعيب، جدة",
-        image: "/images/category-diving.png",
-        images: JSON.stringify([
-          "/images/category-diving.png",
-          "/images/service-yacht.png",
-        ]),
-        rating: 4.7,
-        totalReviews: 112,
-        totalBookings: 389,
-        active: true,
-        featured: true,
-      },
-    }),
-
-    // Service 6: Surfing for Beginners (Provider 2, Diving)
-    prisma.service.create({
-      data: {
-        providerId: provider2.id,
-        categoryId: categoryDiving.id,
-        titleAr: "ركوب الأمواج للمبتدئين",
-        titleEn: "Surfing for Beginners",
-        descriptionAr:
-          "تعلم ركوب الأمواج في بيئة آمنة وممتعة على شواطئ جدة. دورة تدريبية مكثفة مع مدربين محترفين تشمل أساسيات التوازن والسباحة على الأمواج والسلامة البحرية. مت suitable للبالغين والأطفال فوق 10 سنوات. تشمل لوح الأمواج والملابس المائية.",
-        descriptionEn:
-          "Learn surfing in a safe and fun environment on Jeddah's beaches. An intensive training course with professional instructors covering balance basics, wave riding, and sea safety. Suitable for adults and children over 10 years old. Includes surfboard and wetsuit.",
-        price: 350,
-        currency: "SAR",
-        duration: "3 hours",
-        maxPeople: 6,
-        location: "شاطئ الغرابي، جدة",
-        image: "/images/category-beach.png",
-        images: JSON.stringify(["/images/category-beach.png"]),
-        rating: 4.4,
-        totalReviews: 56,
-        totalBookings: 145,
-        active: true,
-        featured: false,
-      },
-    }),
-
-    // Service 7: Mountain Hiking & Trekking (Provider 1, Adventure)
-    prisma.service.create({
-      data: {
-        providerId: provider1.id,
-        categoryId: categoryAdventure.id,
-        titleAr: "تسلق الجبال والتنزه",
-        titleEn: "Mountain Hiking & Trekking",
-        descriptionAr:
-          "رحلة مغامرة في جبال السروات الخضراء بمنطقة أبها. مسارات تنزه متنوعة تناسب جميع المستويات. استمتع بالمناظر الطبيعية الخلابة والهواء النقي والقرى الجبلية التقليدية. يشمل البرنامج نقل ذهاباً وإياباً، وجبة غداء في مطعم جبلي، ودليل جبلي متخصص.",
-        descriptionEn:
-          "An adventure trip in the green Sarawat mountains of the Abha region. Diverse hiking trails suitable for all levels. Enjoy stunning natural scenery, fresh air, and traditional mountain villages. The program includes round-trip transfer, lunch at a mountain restaurant, and a specialized mountain guide.",
-        price: 380,
-        currency: "SAR",
-        duration: "8 hours",
-        maxPeople: 12,
-        location: "جبال السروات، أبها",
-        image: "/images/category-adventure.png",
-        images: JSON.stringify(["/images/category-adventure.png"]),
+          "A specialized physiotherapy session for treating back, neck, and joint pain using the latest techniques. Treatment includes customized exercises, electrical stimulation, heat therapy, and massage. The physiotherapist creates a personalized treatment plan for each patient's condition.",
+        price: 3000,
+        currency: "DZD",
+        duration: "1 hour",
+        maxPeople: 1,
+        wilaya: "16",
+        location: "الجزائر",
+        images: JSON.stringify([]),
         rating: 4.6,
-        totalReviews: 73,
-        totalBookings: 198,
+        totalReviews: 67,
+        totalBookings: 210,
+        active: true,
+        featured: true,
+      },
+    }),
+
+    // Service 4: Acne Treatment (Provider 2, Dermatology)
+    prisma.service.create({
+      data: {
+        providerId: provider2.id,
+        categoryId: catDermatology.id,
+        titleAr: "علاج حب الشباب",
+        titleEn: "Acne Treatment",
+        descriptionAr:
+          "برنامج علاجي متكامل لحب الشباب يشمل التشخيص الدقيق والعلاج بالأدوية والتقنيات الحديثة. يستخدم فريقنا أحدث أجهزة العلاج بالضوء والليزر للتخلص من حب الشباب والبقع الداكنة. يتبع العلاج بخطة متابعة لضمان نتائج دائمة ومظهر بشرة صحي.",
+        descriptionEn:
+          "A comprehensive acne treatment program including accurate diagnosis and treatment with medications and modern techniques. Our team uses the latest light therapy and laser devices to eliminate acne and dark spots. The treatment is followed by a follow-up plan to ensure lasting results and healthy skin appearance.",
+        price: 5000,
+        currency: "DZD",
+        duration: "45 min",
+        maxPeople: 1,
+        wilaya: "25",
+        location: "قسنطينة",
+        images: JSON.stringify([]),
+        rating: 4.8,
+        totalReviews: 29,
+        totalBookings: 78,
+        active: true,
+        featured: true,
+      },
+    }),
+
+    // Service 5: Eye Exam & Correction (Provider 2, Ophthalmology)
+    prisma.service.create({
+      data: {
+        providerId: provider2.id,
+        categoryId: catOphthalmology.id,
+        titleAr: "فحص نظر وتصحيح",
+        titleEn: "Eye Exam & Correction",
+        descriptionAr:
+          "فحص نظر شامل يتضمن فحص قوة النظر وقياس ضغط العين وفحص شبكية العين. يتم تقديم وصفة طبية دقيقة للنظارات أو العدسات اللاصقة المناسبة. نستخدم أحدث أجهزة قياس النصر الرقمية لضمان أعلى دقة في التشخيص.",
+        descriptionEn:
+          "A comprehensive eye exam including vision testing, intraocular pressure measurement, and retinal examination. An accurate prescription is provided for suitable glasses or contact lenses. We use the latest digital vision measurement devices to ensure the highest diagnostic accuracy.",
+        price: 6000,
+        currency: "DZD",
+        duration: "1 hour",
+        maxPeople: 1,
+        wilaya: "25",
+        location: "قسنطينة",
+        images: JSON.stringify([]),
+        rating: 4.5,
+        totalReviews: 18,
+        totalBookings: 55,
         active: true,
         featured: false,
       },
     }),
 
-    // Service 8: Private Yacht Tour (Provider 2, Cruise)
+    // Service 6: Cupping & Herbal Therapy (Provider 1, Alternative Medicine)
     prisma.service.create({
       data: {
-        providerId: provider2.id,
-        categoryId: categoryCruise.id,
-        titleAr: "رحلة اليخت الخاصة",
-        titleEn: "Private Yacht Tour",
+        providerId: provider1.id,
+        categoryId: catAlternativeMedicine.id,
+        titleAr: "حجامة وعلاج بالأعشاب",
+        titleEn: "Cupping & Herbal Therapy",
         descriptionAr:
-          "استأجر يختاً فاخراً خاصاً لك ولعائلتك وأصدقائك في البحر الأحمر. رحلة لا تُنسى تشمل السباحة، الغطس السطحي، صيد الأسماك، وعشاء بحري فاخر على متن اليخت. يتوفر طاقم خدمة متكامل وطاهٍ متخصص في المأكولات البحرية. مثالية للمناسبات الخاصة والاحتفالات.",
+          "جلسة حجامة وعلاج بالأعشاب الطبيعية وفقاً للطرق التقليدية المعتمدة. يساعد العلاج في تنقية الدم وتحسين الدورة الدموية وتخفيف آلام العضلات والمفاصل. يستخدم معالجونا أعشاباً طبيعية عالية الجودة مع تعقيم كامل للأدوات.",
         descriptionEn:
-          "Rent a private luxury yacht for you, your family, and friends on the Red Sea. An unforgettable trip including swimming, snorkeling, fishing, and a luxury seafood dinner on board. Full service crew and a specialized seafood chef available. Perfect for special occasions and celebrations.",
-        price: 3500,
-        currency: "SAR",
-        duration: "8 hours",
-        maxPeople: 12,
-        location: "مارينا جدة، جدة",
-        image: "/images/service-yacht.png",
-        images: JSON.stringify([
-          "/images/service-yacht.png",
-          "/images/category-cruise.png",
-        ]),
+          "A cupping and herbal therapy session following approved traditional methods. The therapy helps purify the blood, improve circulation, and relieve muscle and joint pain. Our practitioners use high-quality natural herbs with fully sterilized equipment.",
+        price: 4000,
+        currency: "DZD",
+        duration: "90 min",
+        maxPeople: 1,
+        wilaya: "16",
+        location: "الجزائر",
+        images: JSON.stringify([]),
         rating: 4.9,
         totalReviews: 41,
-        totalBookings: 89,
+        totalBookings: 88,
+        active: true,
+        featured: true,
+      },
+    }),
+
+    // Service 7: Cardiac ECG Checkup (Provider 2, Cardiology)
+    prisma.service.create({
+      data: {
+        providerId: provider2.id,
+        categoryId: catCardiology.id,
+        titleAr: "فحص القلب بالتخطيط",
+        titleEn: "Cardiac ECG Checkup",
+        descriptionAr:
+          "فحص قلب متكامل يتضمن تخطيط كهربية القلب وتخطيط صدى القلب وتقييم وظائف القلب. يتم إجراء الفحص تحت إشراف طبيب قلب متخصص مع تحليل دقيق للنتائج. يحصل المريض على تقرير مفصل حول صحة القلب مع توصيات المتابعة.",
+        descriptionEn:
+          "A comprehensive cardiac checkup including electrocardiogram (ECG), echocardiogram, and heart function assessment. The examination is conducted under the supervision of a specialized cardiologist with thorough result analysis. Patients receive a detailed report on heart health with follow-up recommendations.",
+        price: 10000,
+        currency: "DZD",
+        duration: "2 hours",
+        maxPeople: 1,
+        wilaya: "25",
+        location: "قسنطينة",
+        images: JSON.stringify([]),
+        rating: 4.7,
+        totalReviews: 22,
+        totalBookings: 64,
+        active: true,
+        featured: false,
+      },
+    }),
+
+    // Service 8: Custom Nutrition Plan (Provider 1, Nutrition & Diet)
+    prisma.service.create({
+      data: {
+        providerId: provider1.id,
+        categoryId: catNutrition.id,
+        titleAr: "خطة غذائية مخصصة",
+        titleEn: "Custom Nutrition Plan",
+        descriptionAr:
+          "خطة غذائية مخصصة بناءً على تحليل شامل للجسم واحتياجاته الغذائية. يضع أخصائي التغذية برنامجاً متكاملاً يتضمن وجبات يومية ومقترحات لبدائل صحية. الخطة مناسبة لإنقاص الوزن أو زيادته أو الحفاظ على صحة عامة مثالية.",
+        descriptionEn:
+          "A custom nutrition plan based on a comprehensive body analysis and dietary needs. The nutritionist creates a complete program including daily meals and healthy alternative suggestions. The plan is suitable for weight loss, weight gain, or maintaining optimal overall health.",
+        price: 4500,
+        currency: "DZD",
+        duration: "1 hour",
+        maxPeople: 1,
+        wilaya: "16",
+        location: "الجزائر",
+        images: JSON.stringify([]),
+        rating: 4.8,
+        totalReviews: 35,
+        totalBookings: 102,
         active: true,
         featured: true,
       },
@@ -408,121 +414,82 @@ async function main() {
   ]);
 
   const [
-    serviceRoyalSafari,
-    serviceDesertCamp,
-    serviceOldCity,
-    serviceBeach,
-    serviceCoralDiving,
-    serviceSurfing,
-    serviceMountain,
-    serviceYacht,
+    serviceCheckup,
+    serviceTeethWhitening,
+    servicePhysiotherapy,
+    serviceAcneTreatment,
+    serviceEyeExam,
+    serviceCupping,
+    serviceCardiac,
+    serviceNutrition,
   ] = services;
 
   console.log(`  ✓ Created 8 services\n`);
 
   // ─────────────────────────────────────────────
-  // 5. BOOKINGS (6 total)
+  // 5. BOOKINGS (4 total)
   // ─────────────────────────────────────────────
   console.log("📅 Creating bookings...");
 
   const now = new Date();
 
-  const bookings = await Promise.all([
-    // Booking 1: Completed - Mohamed booked Royal Safari
-    prisma.booking.create({
-      data: {
-        userId: user1.id,
-        serviceId: serviceRoyalSafari.id,
-        providerId: provider1.id,
-        status: "completed",
-        bookingDate: new Date(now.getFullYear(), now.getMonth() - 1, 15, 9, 0),
-        numberOfPeople: 3,
-        totalPrice: 1350,
-        notes: "نريد مقاعد قريبة من السائق",
-      },
-    }),
+  // Booking 1: Completed - Ahmed booked Comprehensive Checkup (Provider 1)
+  const booking1 = await prisma.booking.create({
+    data: {
+      userId: patient1.id,
+      serviceId: serviceCheckup.id,
+      providerId: provider1.id,
+      status: "completed",
+      bookingDate: new Date(now.getFullYear(), now.getMonth() - 1, 15, 9, 0),
+      numberOfPeople: 1,
+      totalPrice: 8000,
+      notes: "أحتاج تقرير مفصل بالنتائج",
+    },
+  });
 
-    // Booking 2: Completed - John booked Coral Reef Diving
-    prisma.booking.create({
-      data: {
-        userId: user2.id,
-        serviceId: serviceCoralDiving.id,
-        providerId: provider2.id,
-        status: "completed",
-        bookingDate: new Date(now.getFullYear(), now.getMonth() - 1, 22, 8, 0),
-        numberOfPeople: 2,
-        totalPrice: 1300,
-        notes: "First time diving, please provide extra guidance",
-      },
-    }),
+  // Booking 2: Confirmed - Fatima Zohra booked Acne Treatment (Provider 2)
+  const booking2 = await prisma.booking.create({
+    data: {
+      userId: patient2.id,
+      serviceId: serviceAcneTreatment.id,
+      providerId: provider2.id,
+      status: "confirmed",
+      bookingDate: new Date(now.getFullYear(), now.getMonth() + 1, 5, 14, 0),
+      numberOfPeople: 1,
+      totalPrice: 5000,
+      notes: null,
+    },
+  });
 
-    // Booking 3: Completed - Mohamed booked Desert Camp
-    prisma.booking.create({
-      data: {
-        userId: user1.id,
-        serviceId: serviceDesertCamp.id,
-        providerId: provider1.id,
-        status: "completed",
-        bookingDate: new Date(now.getFullYear(), now.getMonth() - 2, 5, 14, 0),
-        numberOfPeople: 4,
-        totalPrice: 3200,
-        notes: "عائلة مع أطفال، نحتاج سريراً إضافياً",
-      },
-    }),
+  // Booking 3: Confirmed - Ahmed booked Cupping & Herbal Therapy (Provider 1)
+  const booking3 = await prisma.booking.create({
+    data: {
+      userId: patient1.id,
+      serviceId: serviceCupping.id,
+      providerId: provider1.id,
+      status: "confirmed",
+      bookingDate: new Date(now.getFullYear(), now.getMonth() + 1, 10, 10, 0),
+      numberOfPeople: 2,
+      totalPrice: 8000,
+      notes: "حجز لشخصين، أرجو تخصيص موعد متتالي",
+    },
+  });
 
-    // Booking 4: Confirmed - John booked Private Yacht
-    prisma.booking.create({
-      data: {
-        userId: user2.id,
-        serviceId: serviceYacht.id,
-        providerId: provider2.id,
-        status: "confirmed",
-        bookingDate: new Date(now.getFullYear(), now.getMonth() + 1, 10, 10, 0),
-        numberOfPeople: 6,
-        totalPrice: 21000,
-        notes: "Birthday celebration - please arrange a cake",
-      },
-    }),
+  // Booking 4: Pending - Fatima Zohra booked Custom Nutrition Plan (Provider 1)
+  const booking4 = await prisma.booking.create({
+    data: {
+      userId: patient2.id,
+      serviceId: serviceNutrition.id,
+      providerId: provider1.id,
+      status: "pending",
+      bookingDate: new Date(now.getFullYear(), now.getMonth() + 2, 1, 11, 0),
+      numberOfPeople: 1,
+      totalPrice: 4500,
+      notes: "هل يمكن الحجز عن بُعد عبر الإنترنت؟",
+    },
+  });
 
-    // Booking 5: Confirmed - Mohamed booked Old City Tour
-    prisma.booking.create({
-      data: {
-        userId: user1.id,
-        serviceId: serviceOldCity.id,
-        providerId: provider1.id,
-        status: "confirmed",
-        bookingDate: new Date(now.getFullYear(), now.getMonth() + 1, 5, 16, 0),
-        numberOfPeople: 2,
-        totalPrice: 400,
-        notes: null,
-      },
-    }),
-
-    // Booking 6: Pending - John booked Mountain Hiking
-    prisma.booking.create({
-      data: {
-        userId: user2.id,
-        serviceId: serviceMountain.id,
-        providerId: provider1.id,
-        status: "pending",
-        bookingDate: new Date(now.getFullYear(), now.getMonth() + 2, 1, 7, 0),
-        numberOfPeople: 4,
-        totalPrice: 1520,
-        notes: "We have moderate hiking experience",
-      },
-    }),
-  ]);
-
-  const [
-    booking1,
-    booking2,
-    booking3,
-    booking4,
-    booking5,
-    booking6,
-  ] = bookings;
-
-  console.log(`  ✓ Created 6 bookings\n`);
+  console.log(`  ✓ Created 4 bookings\n`);
 
   // ─────────────────────────────────────────────
   // 6. REVIEWS (4 total)
@@ -530,50 +497,48 @@ async function main() {
   console.log("⭐ Creating reviews...");
 
   await Promise.all([
-    // Review 1: Mohamed reviews Royal Safari - 5 stars
+    // Review 1: Ahmed reviews Comprehensive Checkup - 5 stars
     prisma.review.create({
       data: {
-        userId: user1.id,
-        serviceId: serviceRoyalSafari.id,
+        userId: patient1.id,
+        serviceId: serviceCheckup.id,
         bookingId: booking1.id,
         rating: 5,
         comment:
-          "تجربة رائعة جداً! السائق محترف والرحلة منظمة بشكل ممتاز. العشاء تحت النجوم كان لحظة ساحرة. أنصح الجميع بتجربتها.",
+          "فحص شامل وممتاز. الطبيب كان متعاون جداً وشرح كل النتائج بتفصيل. التقرير الطبي كان واضحاً وشاملاً. أنصح الجميع بهذا المركز المتميز.",
       },
     }),
 
-    // Review 2: John reviews Coral Reef Diving - 4 stars
+    // Review 2: Ahmed reviews Laser Teeth Whitening - 4 stars
     prisma.review.create({
       data: {
-        userId: user2.id,
-        serviceId: serviceCoralDiving.id,
-        bookingId: booking2.id,
+        userId: patient1.id,
+        serviceId: serviceTeethWhitening.id,
         rating: 4,
         comment:
-          "Great experience for a first-time diver! The instructors were very patient and professional. The coral reefs are absolutely stunning. Only minor issue was the boat was slightly crowded.",
+          "نتائج رائعة وتبييض واضح من الجلسة الأولى. الفريق الطبي محترف والمكان نظيف. لاحظت حساسية بسيطة في الأسنان لبضعة أيام لكنها اختفت بسرعة.",
       },
     }),
 
-    // Review 3: Mohamed reviews Desert Camp - 5 stars
+    // Review 3: Fatima Zohra reviews Physiotherapy Session - 5 stars
     prisma.review.create({
       data: {
-        userId: user1.id,
-        serviceId: serviceDesertCamp.id,
-        bookingId: booking3.id,
+        userId: patient2.id,
+        serviceId: servicePhysiotherapy.id,
         rating: 5,
         comment:
-          "ليلة لا تُنسى في الصحراء! الخيم كانت مريحة والعشاء لذيذ. الأطفال استمتعوا كثيراً بتجربة ركوب الإبل. سنعود بالتأكيد مرة أخرى.",
+          "أخصائي العلاج الطبيعي كان خبيراً ومتعاطفاً. تحسنت حالتي بشكل ملحوظ بعد ثلاث جلسات فقط. الأجهزة المستخدمة حديثة والجو العام مريح.",
       },
     }),
 
-    // Review 4: John reviews Old City Tour (from previous visit, no booking) - 3 stars
+    // Review 4: Fatima Zohra reviews Eye Exam & Correction - 4 stars
     prisma.review.create({
       data: {
-        userId: user2.id,
-        serviceId: serviceOldCity.id,
-        rating: 3,
+        userId: patient2.id,
+        serviceId: serviceEyeExam.id,
+        rating: 4,
         comment:
-          "Interesting tour with good historical information. However, it was quite hot during the day and I wish there were more shaded rest areas. The guide was knowledgeable but spoke very fast.",
+          "فحص دقيق وشامل للنظر. الطبيبة كانت صبورة ومتأنية في الشرح. النظارات جاهزة في الوقت المحدد. خدمة ممتازة ونتائج مرضية.",
       },
     }),
   ]);
@@ -581,53 +546,43 @@ async function main() {
   console.log(`  ✓ Created 4 reviews\n`);
 
   // ─────────────────────────────────────────────
-  // 7. MESSAGES (4 total)
+  // 7. MESSAGES (3 total)
   // ─────────────────────────────────────────────
   console.log("💬 Creating messages...");
 
   await Promise.all([
-    // Message 1: Mohamed asks about Yacht booking details
+    // Message 1: Fatima Zohra asks Dr. Samira about her confirmed acne treatment booking
     prisma.message.create({
       data: {
-        bookingId: booking4.id,
-        senderId: user2.id,
+        bookingId: booking2.id,
+        senderId: patient2.id,
         content:
-          "Hi, can we arrange for a special seafood dinner menu? One of our guests has a shellfish allergy.",
+          "مرحباً دكتورة سميرة، هل أحتاج لإحضار أي تحاليل أو تقارير طبية سابقة قبل موعد الجلسة؟ وهل هناك تعليمات معينة يجب اتباعها قبل العلاج؟",
       },
     }),
 
-    // Message 2: Sarah (Provider 2) responds
+    // Message 2: Dr. Samira responds
     prisma.message.create({
       data: {
-        bookingId: booking4.id,
+        bookingId: booking2.id,
         senderId: provider2User.id,
         content:
-          "Hello John! Absolutely, we can accommodate that. Our chef will prepare a special menu that avoids shellfish. We'll also have a variety of grilled fish and other options. Is there anything else you'd like us to arrange for the birthday celebration?",
+          "أهلاً فاطمة الزهراء، لا تحتاجين لإحضار تحاليل سابقة. يُفضل تجنب وضع أي مستحضرات تجميل على الوجه يوم الجلسة، والتوقف عن استخدام العلاجات الموضعية لمدة 48 ساعة قبل الموعد. نلتقي قريباً إن شاء الله!",
       },
     }),
 
-    // Message 3: Mohamed asks Ahmed about the Old City Tour
+    // Message 3: Fatima Zohra asks about remote nutrition consultation
     prisma.message.create({
       data: {
-        bookingId: booking5.id,
-        senderId: user1.id,
+        bookingId: booking4.id,
+        senderId: patient2.id,
         content:
-          "مرحباً أحمد، هل يمكننا البدء من الساعة 4 عصراً بدلاً من 4؟ الجو سيكون أبرد في وقت متأخر.",
-      },
-    }),
-
-    // Message 4: Ahmed (Provider 1) responds
-    prisma.message.create({
-      data: {
-        bookingId: booking5.id,
-        senderId: provider1User.id,
-        content:
-          "أهلاً محمد! نعم بالتأكيد، لا مشكلة في تغيير الموعد إلى 4 عصراً. سأرسل لك تأكيد الموعد الجديد. هل تحتاج ترتيبات نقل خاصة؟",
+          "مرحباً، أنا من وهران وأود الاستفسار إمكانية إجراء الاستشارة الغذائية عن بُعد عبر الإنترنت بدلاً من الحضور شخصياً إلى الجزائر العاصمة.",
       },
     }),
   ]);
 
-  console.log(`  ✓ Created 4 messages\n`);
+  console.log(`  ✓ Created 3 messages\n`);
 
   // ─────────────────────────────────────────────
   // SUMMARY
@@ -635,13 +590,13 @@ async function main() {
   console.log("═".repeat(50));
   console.log("✅ Seed completed successfully!\n");
   console.log("📊 Summary:");
-  console.log("   Users:     4");
-  console.log("   Providers: 2");
-  console.log("   Categories: 6");
-  console.log("   Services:  8");
-  console.log("   Bookings:  6");
-  console.log("   Reviews:   4");
-  console.log("   Messages:  4");
+  console.log("   Users:      4");
+  console.log("   Providers:  2");
+  console.log("   Categories: 9");
+  console.log("   Services:   8");
+  console.log("   Bookings:   4");
+  console.log("   Reviews:    4");
+  console.log("   Messages:   3");
   console.log("═".repeat(50));
 }
 

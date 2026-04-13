@@ -18,15 +18,15 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "H - Tourism Platform | منصة H السياحية",
+  title: "H - Medical Tourism Algeria | منصة H للسياحة العلاجية في الجزائر",
   description:
-    "Discover amazing tourism experiences with H. Explore the best tours, adventures, and destinations with trusted local providers. اكتشف تجارب سياحية مذهلة مع منصة H.",
-  keywords: ["H", "tourism", "السياحة", "travel", "booking", "tours", "adventures"],
+    "H - Your gateway to medical tourism in Algeria. Discover top healthcare providers, medical services, and therapeutic treatments across all 58 wilayas. بوابتك للسياحة العلاجية في الجزائر.",
+  keywords: ["H", "medical tourism", "السياحة العلاجية", "Algeria", "الجزائر", "healthcare", "الصحة", "booking", "حجز", "doctors", "أطباء"],
   authors: [{ name: "H Platform" }],
   icons: { icon: "/images/logo.png" },
   openGraph: {
-    title: "H - Tourism Platform",
-    description: "Discover amazing tourism experiences with trusted local providers.",
+    title: "H - Medical Tourism Algeria",
+    description: "Discover the best medical and therapeutic services across Algeria's 58 wilayas with trusted healthcare providers.",
     type: "website",
   },
 };

@@ -11,6 +11,7 @@ export async function GET(request: NextRequest) {
     const featured = searchParams.get('featured');
     const providerId = searchParams.get('providerId');
     const sort = searchParams.get('sort');
+    const wilaya = searchParams.get('wilaya');
 
     // Build where clause
     const where: Prisma.ServiceWhereInput = { active: true };
@@ -27,6 +28,10 @@ export async function GET(request: NextRequest) {
       where.providerId = providerId;
     }
 
+    if (wilaya) {
+      where.wilaya = wilaya;
+    }
+
     if (search) {
       where.OR = [
         { titleAr: { contains: search } },
@@ -34,6 +39,7 @@ export async function GET(request: NextRequest) {
         { descriptionAr: { contains: search } },
         { descriptionEn: { contains: search } },
         { location: { contains: search } },
+        { wilaya: { contains: search } },
       ];
     }
 
@@ -72,6 +78,7 @@ export async function GET(request: NextRequest) {
       currency: service.currency,
       duration: service.duration,
       maxPeople: service.maxPeople,
+      wilaya: service.wilaya,
       location: service.location,
       image: service.image,
       images: service.images,
@@ -110,13 +117,14 @@ export async function POST(request: NextRequest) {
       price,
       duration,
       maxPeople,
+      wilaya,
       location,
       image,
       images,
       featured,
     } = body;
 
-    if (!providerId || !categoryId || !titleAr || !titleEn || !descriptionAr || !descriptionEn || !price || !duration || !location) {
+    if (!providerId || !categoryId || !titleAr || !titleEn || !descriptionAr || !descriptionEn || !price || !duration || !wilaya) {
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }
@@ -134,7 +142,8 @@ export async function POST(request: NextRequest) {
         price: parseFloat(price),
         duration,
         maxPeople: maxPeople || 1,
-        location,
+        wilaya,
+        location: location || wilaya,
         image: image || null,
         images: images || '[]',
         featured: featured || false,

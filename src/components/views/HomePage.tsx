@@ -6,10 +6,12 @@ import { useRef, type FormEvent } from 'react';
 import {
   Search, Star, MapPin, Clock, ArrowRight, ChevronDown,
   Shield, Diamond, Lock,
-  Quote, Users, Compass, Award,
+  Quote, Users, Compass, Award, Heart, Stethoscope, Activity,
+  Eye, Smile, Bone, Apple, Sparkles, Leaf,
 } from 'lucide-react';
 import { useAppStore } from '@/lib/store';
 import { useCountUp } from '@/hooks/use-count-up';
+import { WILAYAS, getWilayaName } from '@/lib/wilayas';
 
 // ─── Types ────────────────────────────────────────────────
 interface Category {
@@ -30,6 +32,7 @@ interface Service {
   duration: string;
   maxPeople: number;
   location: string;
+  wilaya?: string;
   image: string | null;
   rating: number;
   totalReviews: number;
@@ -46,18 +49,21 @@ interface Service {
   };
 }
 
-// ─── Icon Map ─────────────────────────────────────────────
-const iconMap: Record<string, React.ReactNode> = {
-  mountain: <Compass className="w-7 h-7" />,
-  city: <Award className="w-7 h-7" />,
-  beach: <Diamond className="w-7 h-7" />,
-  desert: <Star className="w-7 h-7" />,
-  cruise: <Shield className="w-7 h-7" />,
-  diving: <Diamond className="w-7 h-7" />,
+// ─── Medical Category Icon Map ────────────────────────────
+const categoryIconMap: Record<string, React.ReactNode> = {
+  generalMedicine: <Stethoscope className="w-7 h-7" />,
+  dentalCare: <Smile className="w-7 h-7" />,
+  physiotherapy: <Activity className="w-7 h-7" />,
+  dermatology: <Sparkles className="w-7 h-7" />,
+  ophthalmology: <Eye className="w-7 h-7" />,
+  alternativeMedicine: <Leaf className="w-7 h-7" />,
+  cardiology: <Heart className="w-7 h-7" />,
+  orthopedics: <Bone className="w-7 h-7" />,
+  nutrition: <Apple className="w-7 h-7" />,
 };
 
 function getCategoryIcon(icon: string) {
-  return iconMap[icon] || <Compass className="w-7 h-7" />;
+  return categoryIconMap[icon] || <Stethoscope className="w-7 h-7" />;
 }
 
 // ─── Skeleton Card ────────────────────────────────────────
@@ -135,6 +141,129 @@ function RatingStars({ rating }: { rating: number }) {
   );
 }
 
+// ─── Wilaya Dropdown Component ────────────────────────────
+function WilayaDropdown({
+  locale,
+  selectedWilaya,
+  onSelectWilaya,
+}: {
+  locale: 'ar' | 'en';
+  selectedWilaya: string | null;
+  onSelectWilaya: (wilaya: string | null) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [filter, setFilter] = useState('');
+  const dropdownRef = useRef<HTMLDivElement>(null);
+
+  const filtered = WILAYAS.filter((w) => {
+    if (!filter) return true;
+    const q = filter.toLowerCase();
+    return (
+      w.nameAr.includes(q) ||
+      w.nameEn.toLowerCase().includes(q) ||
+      w.code.includes(q)
+    );
+  });
+
+  useEffect(() => {
+    function handleClickOutside(e: MouseEvent) {
+      if (dropdownRef.current && !dropdownRef.current.contains(e.target as Node)) {
+        setOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
+
+  const selectedLabel = selectedWilaya
+    ? getWilayaName(selectedWilaya, locale)
+    : null;
+
+  return (
+    <div className="relative" ref={dropdownRef}>
+      <button
+        type="button"
+        onClick={() => setOpen(!open)}
+        className="flex items-center gap-2 px-4 py-2.5 rounded-xl bg-purple-500/10 border border-purple-500/20 text-purple-300 text-sm font-medium hover:bg-purple-500/20 transition-colors shrink-0"
+      >
+        <MapPin className="w-4 h-4 text-purple-400" />
+        <span className="hidden sm:inline max-w-[120px] truncate">
+          {selectedLabel || (locale === 'ar' ? 'كل الولايات' : 'All Wilayas')}
+        </span>
+        <ChevronDown className={`w-4 h-4 text-purple-400 transition-transform duration-200 ${open ? 'rotate-180' : ''}`} />
+      </button>
+
+      {/* Popover */}
+      {open && (
+        <motion.div
+          initial={{ opacity: 0, y: -8, scale: 0.96 }}
+          animate={{ opacity: 1, y: 0, scale: 1 }}
+          transition={{ duration: 0.2 }}
+          className="absolute top-full mt-2 end-0 z-50 w-72 glass rounded-2xl border border-purple-500/20 shadow-2xl overflow-hidden"
+        >
+          {/* Search within wilayas */}
+          <div className="p-3 border-b border-purple-500/10">
+            <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-purple-500/5">
+              <Search className="w-4 h-4 text-purple-400 shrink-0" />
+              <input
+                type="text"
+                value={filter}
+                onChange={(e) => setFilter(e.target.value)}
+                placeholder={locale === 'ar' ? 'ابحث عن ولاية...' : 'Search wilaya...'}
+                className="w-full bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none"
+                autoFocus
+              />
+            </div>
+          </div>
+
+          {/* Wilaya List */}
+          <div className="max-h-72 overflow-y-auto scrollbar-none">
+            {/* All wilayas option */}
+            <button
+              type="button"
+              onClick={() => {
+                onSelectWilaya(null);
+                setOpen(false);
+                setFilter('');
+              }}
+              className={`w-full text-start px-4 py-2.5 text-sm flex items-center gap-3 hover:bg-purple-500/10 transition-colors ${
+                !selectedWilaya ? 'bg-purple-500/15 text-purple-300' : 'text-foreground'
+              }`}
+            >
+              <MapPin className="w-4 h-4 text-purple-400 shrink-0" />
+              {locale === 'ar' ? 'كل الولايات' : 'All Wilayas'}
+            </button>
+
+            {filtered.map((w) => (
+              <button
+                key={w.code}
+                type="button"
+                onClick={() => {
+                  onSelectWilaya(w.code);
+                  setOpen(false);
+                  setFilter('');
+                }}
+                className={`w-full text-start px-4 py-2.5 text-sm flex items-center gap-3 hover:bg-purple-500/10 transition-colors ${
+                  selectedWilaya === w.code ? 'bg-purple-500/15 text-purple-300' : 'text-foreground'
+                }`}
+              >
+                <span className="text-xs text-muted-foreground font-mono w-6 shrink-0">{w.code}</span>
+                <span className="truncate">{locale === 'ar' ? w.nameAr : w.nameEn}</span>
+              </button>
+            ))}
+
+            {filtered.length === 0 && (
+              <div className="px-4 py-6 text-center text-sm text-muted-foreground">
+                {locale === 'ar' ? 'لا توجد نتائج' : 'No results found'}
+              </div>
+            )}
+          </div>
+        </motion.div>
+      )}
+    </div>
+  );
+}
+
 // ════════════════════════════════════════════════════════════════
 // MAIN COMPONENT
 // ════════════════════════════════════════════════════════════════
@@ -142,6 +271,7 @@ export default function HomePage() {
   const {
     t, locale, isRTL,
     navigateTo, setSelectedCategoryId, setSelectedServiceId,
+    selectedWilaya, setSelectedWilaya,
     searchQuery, setSearchQuery,
   } = useAppStore();
 
@@ -214,22 +344,22 @@ export default function HomePage() {
   // ─── Data for sections ─────────────────────────────────
   const stats = [
     {
-      icon: <Users className="w-6 h-6" />,
-      value: 10000,
+      icon: <Compass className="w-6 h-6" />,
+      value: 58,
       suffix: '+',
-      label: locale === 'ar' ? 'مسافر سعيد' : 'Happy Travelers',
+      label: locale === 'ar' ? 'ولاية جزائرية' : 'Algerian Wilayas',
     },
     {
-      icon: <Shield className="w-6 h-6" />,
+      icon: <Users className="w-6 h-6" />,
       value: 500,
       suffix: '+',
-      label: locale === 'ar' ? 'مزود خدمة موثوق' : 'Verified Providers',
+      label: locale === 'ar' ? 'مقدم رعاية صحية' : 'Healthcare Providers',
     },
     {
-      icon: <Compass className="w-6 h-6" />,
-      value: 50,
+      icon: <Heart className="w-6 h-6" />,
+      value: 10000,
       suffix: '+',
-      label: locale === 'ar' ? 'وجهة سياحية' : 'Destinations',
+      label: locale === 'ar' ? 'مريض سعيد' : 'Happy Patients',
     },
     {
       icon: <Star className="w-6 h-6" />,
@@ -245,52 +375,52 @@ export default function HomePage() {
       title: locale === 'ar' ? 'مزودون موثقون' : 'Verified Providers',
       desc:
         locale === 'ar'
-          ? 'جميع مزودي الخدمة لدينا موثقون ومدققون بعناية لضمان تجارب آمنة وموثوقة'
-          : 'All our service providers are verified and carefully vetted to ensure safe and trustworthy experiences',
+          ? 'جميع الأطباء والعيادات لدينا مرخصون ومعتمدون من وزارة الصحة الجزائرية لضمان رعاية صحية آمنة وموثوقة'
+          : 'All our doctors and clinics are licensed and certified by the Algerian Ministry of Health for safe and reliable healthcare',
     },
     {
       icon: '💎',
-      title: locale === 'ar' ? 'تجارب فاخرة' : 'Premium Experiences',
+      title: locale === 'ar' ? 'رعاية صحية متميزة' : 'Quality Healthcare',
       desc:
         locale === 'ar'
-          ? 'رحلات سياحية مختارة بعناية تتميز بالفخامة والتميز لتحصل على أفضل تجربة'
-          : 'Handpicked luxury tours that stand out with excellence and distinction for the best experience',
+          ? 'خدمات طبية عالية الجودة بأسعار تنافسية مع أحدث التقنيات الطبية في أفضل العيادات والمراكز المتخصصة'
+          : 'High-quality medical services at competitive prices with the latest medical technology in top specialized clinics and centers',
     },
     {
       icon: '🔒',
       title: locale === 'ar' ? 'حجز آمن' : 'Secure Booking',
       desc:
         locale === 'ar'
-          ? 'دفع آمن ومحمي مع تأكيد فوري للحجز واسترداد سهل للأموال'
-          : 'Safe and protected payments with instant booking confirmation and easy refunds',
+          ? 'حجز مواعيدك الطبية بسهولة وأمان مع تأكيد فوري واسترداد سهل للأموال ودعم متواصل'
+          : 'Book your medical appointments easily and securely with instant confirmation, easy refunds, and continuous support',
     },
   ];
 
   const testimonials = [
     {
-      name: locale === 'ar' ? 'أحمد الراشد' : 'Ahmed Al-Rashid',
+      name: locale === 'ar' ? 'أمين بلقاسم' : 'Amine Belkacem',
       text:
         locale === 'ar'
-          ? 'تجربة لا تُنسى! أفضل خدمة سفاري جربتها على الإطلاق. المنصة سهلة الاستخدام والمزود محترف جداً.'
-          : 'An unforgettable experience! Best safari service I\'ve ever tried. The platform is easy to use and the provider is extremely professional.',
+          ? 'تجربة رائعة في السياحة العلاجية! حجزت موعداً مع أفضل طبيب قلب في الجزائر العاصمة عبر منصة H. الخدمة كانت سلسة والنتائج ممتازة.'
+          : 'An amazing medical tourism experience! I booked an appointment with the best cardiologist in Algiers through the H platform. The service was smooth and the results were excellent.',
       rating: 5,
       avatar: '/images/avatar-1.png',
     },
     {
-      name: locale === 'ar' ? 'سارة محمد' : 'Sara Mohammed',
+      name: locale === 'ar' ? 'فاطمة الزهراء بوعلام' : 'Fatima Zohra Boualem',
       text:
         locale === 'ar'
-          ? 'الحجز كان سهلاً جداً والتجربة فاقت توقعاتي. أنصح الجميع بتجربة منصة H.'
-          : 'Booking was super easy and the experience exceeded my expectations. I recommend everyone to try the H platform.',
+          ? 'سافرت من وهران إلى قسنطينة لعلاج أسناني. المنصة ساعدتني في إيجاد أفضل عيادة أسنان والتنسيق بين الموعد والسفر. أنصح بها بشدة!'
+          : 'I traveled from Oran to Constantine for dental treatment. The platform helped me find the best dental clinic and coordinate between the appointment and travel. Highly recommended!',
       rating: 5,
       avatar: '/images/avatar-2.png',
     },
     {
-      name: locale === 'ar' ? 'خالد ناصر' : 'Khalid Nasser',
+      name: locale === 'ar' ? 'يوسف مرابط' : 'Youcef Merabet',
       text:
         locale === 'ar'
-          ? 'سأعود بالتأكيد! الأسعار معقولة والخدمة ممتازة. فريق الدعم متجاوب جداً.'
-          : 'Will definitely come back! Reasonable prices and excellent service. The support team is very responsive.',
+          ? 'العلاج الطبيعي الذي تلقيته في بجاية كان مذهلاً. الطبيب متخصص والأسعار معقولة جداً مقارنة بالخارج. شكراً منصة H!'
+          : 'The physiotherapy I received in Béjaïa was incredible. The doctor is a specialist and the prices are very reasonable compared to abroad. Thank you H platform!',
       rating: 5,
       avatar: '/images/avatar-3.png',
     },
@@ -320,7 +450,7 @@ export default function HomePage() {
         {/* BG Image */}
         <div
           className="absolute inset-0 hero-bg"
-          style={{ backgroundImage: "url('/images/hero-desert.png')" }}
+          style={{ backgroundImage: "url('/images/hero-medical.png')" }}
         />
 
         {/* Animated Purple Gradient Overlay */}
@@ -346,11 +476,11 @@ export default function HomePage() {
             {/* Title */}
             <h1 className="text-5xl md:text-7xl font-black leading-tight mb-6">
               <span className="text-shimmer-purple">
-                {locale === 'ar' ? 'اكتشف' : 'Discover'}
+                {t('heroTitle')}
               </span>
               <br />
               <span className="text-shimmer-purple">
-                {locale === 'ar' ? 'المملكة مع' : 'the Kingdom with'}
+                {t('heroSubtitle')}
               </span>{' '}
               <span className="text-gradient-gold">H</span>
             </h1>
@@ -363,46 +493,50 @@ export default function HomePage() {
               className="text-white/70 text-lg max-w-2xl mx-auto mb-10 leading-relaxed"
             >
               {locale === 'ar'
-                ? 'رحلات سياحية فاخرة مع أفضل مزودي الخدمة الموثوقين في المملكة العربية السعودية'
-                : 'Luxury tourism experiences with the most trusted service providers in Saudi Arabia'}
+                ? 'رعاية صحية متميزة مع أفضل الأطباء والعيادات في الجمهورية الجزائرية الديمقراطية الشعبية'
+                : 'Premium healthcare with the best doctors and clinics across the People\'s Democratic Republic of Algeria'}
             </motion.p>
 
-            {/* Search Bar */}
-            <motion.form
+            {/* Search Bar + Wilaya Dropdown */}
+            <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.7 }}
-              onSubmit={handleSearch}
-              className="max-w-xl mx-auto mb-8"
+              className="max-w-2xl mx-auto mb-8"
             >
-              <div className="glass rounded-2xl p-2 flex items-center gap-2 purple-glow-focus border border-purple-500/20">
-                <div className="flex-1 flex items-center gap-3 px-4">
-                  <Search className="w-5 h-5 text-purple-400 shrink-0" />
-                  <input
-                    name="search"
-                    type="text"
-                    placeholder={
-                      locale === 'ar'
-                        ? 'ابحث عن تجارب ووجهات...'
-                        : 'Search experiences & destinations...'
-                    }
-                    defaultValue={searchQuery}
-                    className="w-full bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none py-2.5"
+              <form onSubmit={handleSearch}>
+                <div className="glass rounded-2xl p-2 flex items-center gap-2 purple-glow-focus border border-purple-500/20">
+                  <div className="flex-1 flex items-center gap-3 px-4">
+                    <Search className="w-5 h-5 text-purple-400 shrink-0" />
+                    <input
+                      name="search"
+                      type="text"
+                      placeholder={t('searchServices')}
+                      defaultValue={searchQuery}
+                      className="w-full bg-transparent text-sm text-foreground placeholder:text-muted-foreground focus:outline-none py-2.5"
+                    />
+                  </div>
+                  <WilayaDropdown
+                    locale={locale}
+                    selectedWilaya={selectedWilaya}
+                    onSelectWilaya={(w) => {
+                      setSelectedWilaya(w);
+                    }}
                   />
+                  <motion.button
+                    whileHover={{ scale: 1.03 }}
+                    whileTap={{ scale: 0.97 }}
+                    type="submit"
+                    className="btn-purple-gradient btn-shimmer px-6 py-2.5 rounded-xl text-sm font-semibold flex items-center gap-2 shrink-0"
+                  >
+                    <Search className="w-4 h-4" />
+                    <span className="hidden sm:inline">
+                      {locale === 'ar' ? 'بحث' : 'Search'}
+                    </span>
+                  </motion.button>
                 </div>
-                <motion.button
-                  whileHover={{ scale: 1.03 }}
-                  whileTap={{ scale: 0.97 }}
-                  type="submit"
-                  className="btn-purple-gradient btn-shimmer px-6 py-2.5 rounded-xl text-sm font-semibold flex items-center gap-2 shrink-0"
-                >
-                  <Search className="w-4 h-4" />
-                  <span className="hidden sm:inline">
-                    {locale === 'ar' ? 'بحث' : 'Search'}
-                  </span>
-                </motion.button>
-              </div>
-            </motion.form>
+              </form>
+            </motion.div>
 
             {/* CTA Buttons */}
             <motion.div
@@ -417,7 +551,7 @@ export default function HomePage() {
                 onClick={() => navigateTo('services')}
                 className="btn-purple-gradient btn-shimmer px-8 py-3 rounded-xl font-semibold flex items-center gap-2 text-sm"
               >
-                {locale === 'ar' ? 'استكشف الخدمات' : 'Explore Services'}
+                {t('heroCta')}
                 <ArrowRight className="w-4 h-4" />
               </motion.button>
               <motion.button
@@ -429,7 +563,7 @@ export default function HomePage() {
                 }}
                 className="px-8 py-3 rounded-xl border border-purple-500/30 bg-purple-500/5 text-purple-300 font-semibold text-sm flex items-center gap-2 hover:bg-purple-500/10 hover:border-purple-500/50 transition-all duration-300"
               >
-                {locale === 'ar' ? 'تصفح الفئات' : 'Browse Categories'}
+                {t('heroSecondary')}
               </motion.button>
             </motion.div>
           </motion.div>
@@ -451,7 +585,7 @@ export default function HomePage() {
       </section>
 
       {/* ════════════════════════════════════════════════════════════
-          2. CATEGORIES SECTION
+          2. CATEGORIES SECTION — Medical Specialties
           ════════════════════════════════════════════════════════════ */}
       <section id="categories-section" className="py-20 bg-mesh-gradient">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
@@ -463,23 +597,26 @@ export default function HomePage() {
             className="text-center mb-14"
           >
             <p className="text-xs text-purple-400 uppercase tracking-widest font-semibold mb-3">
-              {locale === 'ar' ? 'الفئات' : 'Categories'}
+              {locale === 'ar' ? 'التخصصات الطبية' : 'Medical Specialties'}
             </p>
             <h2 className="text-3xl sm:text-4xl font-bold text-gradient-purple">
-              {locale === 'ar' ? 'استكشف الفئات' : 'Explore Categories'}
+              {t('categoriesTitle')}
             </h2>
+            <p className="text-muted-foreground mt-3 max-w-lg mx-auto text-sm">
+              {t('categoriesSubtitle')}
+            </p>
           </motion.div>
 
           {/* Category Grid */}
           {catLoading ? (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-              {[1, 2, 3, 4, 5, 6].map((i) => (
+              {[1, 2, 3, 4, 5, 6, 7, 8, 9].map((i) => (
                 <div key={i} className="h-48 rounded-2xl bg-purple-500/10 animate-pulse" />
               ))}
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-5">
-              {categories.slice(0, 6).map((cat, idx) => (
+              {categories.slice(0, 9).map((cat, idx) => (
                 <motion.button
                   key={cat.id}
                   initial={{ opacity: 0, y: 30 }}
@@ -499,7 +636,7 @@ export default function HomePage() {
                     style={{
                       backgroundImage: cat.image
                         ? `url(${cat.image})`
-                        : `url('/images/category-${cat.icon || 'adventure'}.png')`,
+                        : `url('/images/category-${cat.icon || 'generalMedicine'}.png')`,
                     }}
                   />
 
@@ -520,7 +657,7 @@ export default function HomePage() {
                     <div className="inline-flex self-start">
                       <span className="bg-purple-500/20 text-purple-300 text-xs font-medium px-3 py-1 rounded-full">
                         {cat.serviceCount}{' '}
-                        {locale === 'ar' ? 'خدمة' : 'services'}
+                        {locale === 'ar' ? 'خدمة طبية' : 'medical services'}
                       </span>
                     </div>
 
@@ -553,8 +690,11 @@ export default function HomePage() {
               {locale === 'ar' ? 'المميزة' : 'Featured'}
             </p>
             <h2 className="text-3xl sm:text-4xl font-bold text-shimmer-gold">
-              {locale === 'ar' ? 'تجارب مميزة' : 'Featured Experiences'}
+              {t('featuredServices')}
             </h2>
+            <p className="text-muted-foreground mt-3 max-w-lg mx-auto text-sm">
+              {t('servicesSubtitle')}
+            </p>
           </motion.div>
 
           {loading ? (
@@ -586,7 +726,7 @@ export default function HomePage() {
                           />
                         ) : (
                           <div className="w-full h-full bg-gradient-to-br from-purple-500/20 to-purple-900/30 flex items-center justify-center">
-                            <Compass className="w-12 h-12 text-purple-400/40" />
+                            <Stethoscope className="w-12 h-12 text-purple-400/40" />
                           </div>
                         )}
 
@@ -596,8 +736,7 @@ export default function HomePage() {
                         {/* Price Tag — top-right, gold gradient pill */}
                         <div className="absolute top-3 right-3 z-10">
                           <span className="btn-gold-gradient rounded-full px-3 py-1 text-xs font-bold">
-                            {service.price}{' '}
-                            {locale === 'ar' ? 'ر.س' : (service.currency || 'SAR')}
+                            {service.price.toLocaleString()} {t('dzd')}
                           </span>
                         </div>
 
@@ -630,7 +769,7 @@ export default function HomePage() {
                           </span>
                         </div>
 
-                        {/* Duration + Location */}
+                        {/* Duration + Wilaya */}
                         <div className="flex items-center gap-4 text-xs text-muted-foreground mb-4">
                           <span className="flex items-center gap-1.5">
                             <Clock className="w-3.5 h-3.5 text-purple-400" />
@@ -638,7 +777,9 @@ export default function HomePage() {
                           </span>
                           <span className="flex items-center gap-1.5">
                             <MapPin className="w-3.5 h-3.5 text-purple-400" />
-                            {service.location}
+                            {service.wilaya
+                              ? getWilayaName(service.wilaya, locale)
+                              : service.location}
                           </span>
                         </div>
 
@@ -676,7 +817,7 @@ export default function HomePage() {
               onClick={() => navigateTo('services')}
               className="btn-purple-gradient btn-shimmer px-8 py-3 rounded-xl font-semibold text-sm flex items-center gap-2 mx-auto"
             >
-              {locale === 'ar' ? 'عرض جميع الخدمات' : 'View All Services'}
+              {t('servicesTitle')}
               <ArrowRight className="w-4 h-4" />
             </motion.button>
           </motion.div>
@@ -700,6 +841,11 @@ export default function HomePage() {
             <h2 className="text-3xl sm:text-4xl font-bold text-gradient-purple">
               {locale === 'ar' ? 'أرقامنا تتحدث' : 'Our Numbers Speak'}
             </h2>
+            <p className="text-muted-foreground mt-3 max-w-lg mx-auto text-sm">
+              {locale === 'ar'
+                ? 'ثقة آلاف المرضى في جميع أنحاء الجزائر'
+                : 'Trusted by thousands of patients across Algeria'}
+            </p>
           </motion.div>
 
           <div className="grid grid-cols-2 lg:grid-cols-4 gap-4 sm:gap-6">
@@ -711,7 +857,7 @@ export default function HomePage() {
       </section>
 
       {/* ════════════════════════════════════════════════════════════
-          5. WHY H? SECTION
+          5. WHY H? SECTION — Medical Tourism Advantages
           ════════════════════════════════════════════════════════════ */}
       <section className="py-20">
         <div className="max-w-7xl mx-auto px-4 sm:px-6">
@@ -728,6 +874,11 @@ export default function HomePage() {
             <h2 className="text-3xl sm:text-4xl font-bold text-gradient-mixed">
               {locale === 'ar' ? 'لماذا تختار H؟' : 'Why Choose H?'}
             </h2>
+            <p className="text-muted-foreground mt-3 max-w-lg mx-auto text-sm">
+              {locale === 'ar'
+                ? 'وجهتك الأولى للسياحة العلاجية في الجزائر'
+                : 'Your first destination for medical tourism in Algeria'}
+            </p>
           </motion.div>
 
           {/* Feature Cards */}
@@ -768,10 +919,10 @@ export default function HomePage() {
             className="text-center mb-14"
           >
             <p className="text-xs text-purple-400 uppercase tracking-widest font-semibold mb-3">
-              {locale === 'ar' ? 'آراء العملاء' : 'Testimonials'}
+              {locale === 'ar' ? 'آراء المرضى' : 'Patient Testimonials'}
             </p>
             <h2 className="text-3xl sm:text-4xl font-bold text-gradient-mixed">
-              {locale === 'ar' ? 'ماذا يقول عملاؤنا' : 'What Our Clients Say'}
+              {locale === 'ar' ? 'ماذا يقول مرضانا' : 'What Our Patients Say'}
             </h2>
           </motion.div>
 

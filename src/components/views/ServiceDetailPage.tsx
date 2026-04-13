@@ -8,6 +8,7 @@ import {
   Send, Minus, Plus
 } from 'lucide-react';
 import { useAppStore } from '@/lib/store';
+import { getWilayaName } from '@/lib/wilayas';
 
 /* ═══════════════════════════════════════════════════════════════════════════
    Types
@@ -24,6 +25,7 @@ interface ServiceDetail {
   duration: string;
   maxPeople: number;
   location: string;
+  wilaya?: string;
   image: string | null;
   images: string;
   rating: number;
@@ -342,7 +344,7 @@ export default function ServiceDetailPage() {
             </h1>
             <div className="flex flex-wrap items-center gap-4 text-sm text-gray-300">
               <span className="flex items-center gap-1.5">
-                <MapPin className="w-4 h-4 text-purple-400" />{service.location}
+                <MapPin className="w-4 h-4 text-purple-400" />{service.wilaya ? getWilayaName(service.wilaya, locale) : service.location}
               </span>
               <span className="flex items-center gap-1.5">
                 <Clock className="w-4 h-4 text-purple-400" />{service.duration}
@@ -400,7 +402,7 @@ export default function ServiceDetailPage() {
                 {
                   icon: <MapPin className="w-5 h-5" />,
                   label: t('location'),
-                  value: service.location,
+                  value: service.wilaya ? getWilayaName(service.wilaya, locale) : service.location,
                 },
                 {
                   icon: <Users className="w-5 h-5" />,
@@ -659,7 +661,7 @@ export default function ServiceDetailPage() {
                   <p className="text-xs text-muted-foreground mb-1">{t('perPerson')}</p>
                   <p className="text-4xl font-black text-shimmer-gold">
                     {service.price}
-                    <span className="text-base text-gold/50 ms-1">{t('sar')}</span>
+                    <span className="text-base text-gold/50 ms-1">{t('dzd')}</span>
                   </p>
                 </div>
 
@@ -726,7 +728,7 @@ export default function ServiceDetailPage() {
                   <span className="text-sm text-muted-foreground font-medium">{t('totalPrice')}</span>
                   <span className="text-2xl font-black text-gradient-gold">
                     {service.price * bookingPeople}
-                    <span className="text-sm text-gold/50 ms-1">{t('sar')}</span>
+                    <span className="text-sm text-gold/50 ms-1">{t('dzd')}</span>
                   </span>
                 </div>
 
@@ -812,7 +814,7 @@ export default function ServiceDetailPage() {
                       </span>
                     )}
                     <div className="absolute bottom-2 right-2 px-2.5 py-1 rounded-lg glass border border-gold/30 text-gold font-bold text-xs">
-                      {svc.price} <span className="text-[9px] text-gold/60">{t('sar')}</span>
+                      {svc.price} <span className="text-[9px] text-gold/60">{t('dzd')}</span>
                     </div>
                   </div>
                   <div className="p-4">
