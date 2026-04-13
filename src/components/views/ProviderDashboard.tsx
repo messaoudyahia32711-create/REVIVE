@@ -7,6 +7,7 @@ import {
   DollarSign, Star, Plus, Pencil, Trash2, ChevronLeft, ChevronRight,
   Send, MapPin, Users, Loader2, Award, TrendingUp, Menu, Sparkles,
   CheckCircle2, XCircle, ShieldCheck, Clock, X, Globe, Building2, Eye, ChevronDown,
+  PanelRightClose, PanelRightOpen,
 } from 'lucide-react';
 import {
   BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer,
@@ -40,7 +41,7 @@ import { WILAYAS, searchWilayas, getWilayaName } from '@/lib/wilayas';
 
 // ── Types ──────────────────────────────────────────────────────────────────
 
-type TabId = 'analytics' | 'services' | 'bookings' | 'messages' | 'settings';
+type TabId = 'analytics' | 'services' | 'addService' | 'bookings' | 'messages' | 'settings';
 
 interface DashboardStats {
   totalBookings: number; totalRevenue: number; totalServices: number;
@@ -203,6 +204,7 @@ export default function ProviderDashboard() {
   const [newMessage, setNewMessage] = useState('');
   const [sendingMessage, setSendingMessage] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const pollingRef = useRef<ReturnType<typeof setInterval> | null>(null);
 
   const providerId = user?.providerId;
 
@@ -273,6 +275,17 @@ export default function ProviderDashboard() {
     })();
   }, [fetchDashboard, fetchServices, fetchCategories, fetchBookings, fetchProvider]);
 
+  // ── Auto-poll messages every 3 seconds ──────────────────────────────────
+  useEffect(() => {
+    if (pollingRef.current) clearInterval(pollingRef.current);
+    if (selectedConversation) {
+      pollingRef.current = setInterval(() => {
+        fetchMessages(selectedConversation.id);
+      }, 3000);
+    }
+    return () => { if (pollingRef.current) clearInterval(pollingRef.current); };
+  }, [selectedConversation, fetchMessages]);
+
   useEffect(() => { messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' }); }, [messages]);
 
   // ── Helpers ──────────────────────────────────────────────────────────────
@@ -305,11 +318,11 @@ export default function ProviderDashboard() {
 
   const openAddService = () => {
     resetForm();
-    // Default wilaya to the provider's own wilaya
     if (provider?.wilaya) {
       setServiceForm(prev => ({ ...prev, wilaya: provider.wilaya! }));
     }
-    setServiceDialogOpen(true);
+    setActiveTab('addService');
+    setSidebarOpen(false);
   };
 
   const openEditService = (s: ServiceItem) => {
@@ -324,7 +337,7 @@ export default function ProviderDashboard() {
     setServiceDialogOpen(true);
   };
 
-  const handleSaveService = async () => {
+  const handleSaveService = async (fromPage = false) => {
     if (!providerId || !serviceForm.titleAr || !serviceForm.titleEn || !serviceForm.categoryId || !serviceForm.price || !serviceForm.duration || !serviceForm.wilaya) {
       showToast(locale === 'ar' ? 'يرجى ملء جميع الحقول المطلوبة (بما في ذلك الولاية)' : 'Please fill all required fields (including wilaya)', 'error');
       return;
@@ -338,7 +351,12 @@ export default function ProviderDashboard() {
         else showToast(locale === 'ar' ? 'فشل التحديث' : 'Update failed', 'error');
       } else {
         const res = await fetch('/api/services', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ providerId, ...body }) });
-        if (res.ok) { showToast(locale === 'ar' ? 'تم إضافة الخدمة' : 'Service created', 'success'); fetchServices(); fetchDashboard(); setServiceDialogOpen(false); resetForm(); }
+        if (res.ok) {
+          showToast(locale === 'ar' ? 'تم إضافة الخدمة بنجاح' : 'Service created successfully', 'success');
+          fetchServices(); fetchDashboard();
+          if (fromPage) { setActiveTab('services'); resetForm(); }
+          else { setServiceDialogOpen(false); resetForm(); }
+        }
         else showToast(locale === 'ar' ? 'فشل الإضافة' : 'Create failed', 'error');
       }
     } catch { showToast(locale === 'ar' ? 'خطأ في الاتصال' : 'Connection error', 'error'); }
@@ -386,6 +404,7 @@ export default function ProviderDashboard() {
   const navItems: { id: TabId; icon: React.ElementType; label: string }[] = [
     { id: 'analytics', icon: LayoutDashboard, label: t('analytics') },
     { id: 'services', icon: Package, label: t('manageServices') },
+    { id: 'addService', icon: Plus, label: locale === 'ar' ? 'إضافة خدمة' : 'Add Service' },
     { id: 'bookings', icon: CalendarCheck, label: t('recentBookings') },
     { id: 'messages', icon: MessageSquare, label: locale === 'ar' ? 'الرسائل' : 'Messages' },
     { id: 'settings', icon: Settings, label: locale === 'ar' ? 'الإعدادات' : 'Settings' },
@@ -394,7 +413,7 @@ export default function ProviderDashboard() {
   const filteredBookings = bookingFilter === 'all' ? bookings : bookings.filter(b => b.status === bookingFilter);
   const conversations = bookings.slice(0, 15);
 
-  // ── Sidebar Content ──────────────────────────────────────────────────────
+  // ── Sidebar Content (Right Side) ────────────────────────────────────────
 
   const renderSidebarContent = () => (
     <div className="flex flex-col h-full">
@@ -441,7 +460,7 @@ export default function ProviderDashboard() {
           return (
             <motion.button
               key={item.id}
-              initial={{ opacity: 0, x: isRTL ? 20 : -20 }}
+              initial={{ opacity: 0, x: 20 }}
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.1 + idx * 0.05 }}
               onClick={() => { setActiveTab(item.id); setSidebarOpen(false); }}
@@ -455,7 +474,7 @@ export default function ProviderDashboard() {
               {isActive && (
                 <motion.div
                   layoutId="prov-sidebar-active"
-                  className={cn('absolute top-2 bottom-2 w-[3px] rounded-full bg-gradient-to-b from-purple-400 via-purple-600 to-purple-800', isRTL ? 'right-0' : 'left-0')}
+                  className="absolute top-2 bottom-2 w-[3px] rounded-full bg-gradient-to-b from-purple-400 via-purple-600 to-purple-800 right-0"
                   transition={{ type: 'spring', stiffness: 300, damping: 30 }}
                 />
               )}
@@ -468,7 +487,7 @@ export default function ProviderDashboard() {
 
       <div className="p-3 border-t border-purple-500/10">
         <button
-          onClick={() => useAppStore.getState().navigateTo('home')}
+          onClick={() => { useAppStore.getState().navigateTo('home'); setSidebarOpen(false); }}
           className="w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium text-white/60 hover:text-white hover:bg-white/8 transition-all"
         >
           {isRTL ? <ChevronRight className="h-5 w-5" /> : <ChevronLeft className="h-5 w-5" />}
@@ -500,6 +519,92 @@ export default function ProviderDashboard() {
     </motion.div>
   );
 
+  // ── Wilaya Dropdown Component (reusable) ────────────────────────────────
+
+  const WilayaDropdown = ({ value, onChange }: { value: string; onChange: (v: string) => void }) => (
+    <div className="space-y-2">
+      <Label className="text-xs font-semibold uppercase tracking-wider text-purple-300">
+        <MapPin className="w-3 h-3 inline me-1 text-purple-400" />
+        {locale === 'ar' ? 'الولاية' : 'Wilaya'} *
+      </Label>
+      <div className="relative" ref={wilayaDropdownRef}>
+        <button
+          type="button"
+          onClick={() => { setShowWilayaDropdown(!showWilayaDropdown); setWilayaSearch(''); }}
+          className={cn(
+            'w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm transition-all duration-200 border',
+            'bg-purple-500/5 border-purple-500/15 text-white hover:border-purple-500/30 focus-visible:ring-2 focus-visible:ring-purple-500/30',
+            !value && 'text-muted-foreground',
+          )}
+        >
+          <span>
+            {value
+              ? `${getWilayaName(value, locale)} (${value})`
+              : (locale === 'ar' ? 'اختر ولاية...' : 'Select wilaya...')}
+          </span>
+          {value && (
+            <span
+              role="button"
+              onClick={(e) => { e.stopPropagation(); onChange(''); setWilayaSearch(''); }}
+              className="text-muted-foreground hover:text-white me-2"
+            >
+              <X className="w-3.5 h-3.5" />
+            </span>
+          )}
+          <ChevronDown className={cn('w-4 h-4 text-muted-foreground transition-transform', showWilayaDropdown && 'rotate-180')} />
+        </button>
+        {showWilayaDropdown && (
+          <div className="absolute z-50 mt-2 w-full rounded-xl glass border border-purple-500/15 bg-gray-950/98 shadow-2xl shadow-purple-500/10 overflow-hidden">
+            <div className="p-2 border-b border-purple-500/10">
+              <div className="relative">
+                <input
+                  autoFocus
+                  type="text"
+                  placeholder={locale === 'ar' ? 'ابحث عن ولاية...' : 'Search wilaya...'}
+                  value={wilayaSearch}
+                  onChange={(e) => setWilayaSearch(e.target.value)}
+                  className="w-full bg-purple-500/5 border border-purple-500/15 rounded-lg px-3 py-2 text-sm text-white placeholder:text-muted-foreground focus:outline-none focus:border-purple-500/30"
+                />
+                {wilayaSearch && (
+                  <button type="button" onClick={() => setWilayaSearch('')}
+                    className="absolute end-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-white">
+                    <X className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
+            </div>
+            <ScrollArea className="max-h-56">
+              <div className="p-1">
+                {searchWilayas(wilayaSearch).map((w) => {
+                  const isActive = value === w.code;
+                  return (
+                    <button
+                      key={w.code}
+                      type="button"
+                      onClick={() => { onChange(w.code); setShowWilayaDropdown(false); setWilayaSearch(''); }}
+                      className={cn(
+                        'w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors',
+                        isActive ? 'bg-purple-500/20 text-purple-300' : 'text-white/80 hover:bg-purple-500/10 hover:text-white',
+                      )}
+                    >
+                      <span>{locale === 'ar' ? w.nameAr : w.nameEn}</span>
+                      <span className="text-xs text-muted-foreground ms-2">{w.code}</span>
+                    </button>
+                  );
+                })}
+                {searchWilayas(wilayaSearch).length === 0 && (
+                  <p className="text-center text-sm text-muted-foreground py-4">
+                    {locale === 'ar' ? 'لم يتم العثور على ولاية' : 'No wilaya found'}
+                  </p>
+                )}
+              </div>
+            </ScrollArea>
+          </div>
+        )}
+      </div>
+    </div>
+  );
+
   // ── Analytics Tab ────────────────────────────────────────────────────────
 
   const renderAnalyticsTab = () => {
@@ -513,7 +618,6 @@ export default function ProviderDashboard() {
           <p className="text-muted-foreground text-sm">{locale === 'ar' ? 'مرحباً بك في لوحة التحكم' : 'Welcome to your dashboard'}</p>
         </motion.div>
 
-        {/* Stat Cards */}
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-5">
           <StatCard icon={CalendarCheck} label={t('totalBookings')} value={stats.totalBookings}
             gradient="bg-gradient-to-br from-teal-500 to-teal-700" />
@@ -525,7 +629,6 @@ export default function ProviderDashboard() {
             gradient="bg-gradient-to-br from-gold-dark to-gold" isGold />
         </div>
 
-        {/* Revenue Chart */}
         <motion.div variants={staggerItem}>
           <div className="glass rounded-2xl p-6 border border-purple-500/10">
             <CardHeader className="p-0 pb-4">
@@ -559,7 +662,6 @@ export default function ProviderDashboard() {
           </div>
         </motion.div>
 
-        {/* Popular Services */}
         <motion.div variants={staggerItem}>
           <h2 className="text-lg font-bold mb-5 flex items-center gap-2 text-white">
             <Award className="h-5 w-5 text-gold" />
@@ -680,18 +782,17 @@ export default function ProviderDashboard() {
         </div>
       )}
 
-      {/* Service Dialog */}
+      {/* Edit Service Dialog (only for editing) */}
       <Dialog open={serviceDialogOpen} onOpenChange={(open) => { setServiceDialogOpen(open); if (!open) resetForm(); }}>
         <DialogTrigger asChild><span /></DialogTrigger>
         <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto p-0 glass border-purple-500/15 bg-gray-950/95">
           <div className="p-6 border-b border-purple-500/10 bg-gradient-to-r from-purple-500/5 to-transparent">
             <DialogTitle className="text-xl font-bold flex items-center gap-2 text-white">
-              <Sparkles className="h-5 w-5 text-gold" />
-              {editingService ? t('editService') : t('addService')}
+              <Pencil className="h-5 w-5 text-purple-400" />
+              {t('editService')}
             </DialogTitle>
           </div>
           <div className="p-6 space-y-5">
-            {/* Bilingual titles */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label className="text-xs font-semibold uppercase tracking-wider text-purple-300">
@@ -710,8 +811,6 @@ export default function ProviderDashboard() {
                   className="bg-purple-500/5 border-purple-500/15 text-white focus-visible:ring-purple-500/30" />
               </div>
             </div>
-
-            {/* Bilingual descriptions */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div className="space-y-2">
                 <Label className="text-xs font-semibold uppercase tracking-wider text-purple-300">{t('serviceDescription')} (AR)</Label>
@@ -726,8 +825,6 @@ export default function ProviderDashboard() {
                   className="bg-purple-500/5 border-purple-500/15 text-white focus-visible:ring-purple-500/30" />
               </div>
             </div>
-
-            {/* Category, Price, Duration */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label className="text-xs font-semibold uppercase tracking-wider text-purple-300">{t('serviceCategory')}</Label>
@@ -754,95 +851,7 @@ export default function ProviderDashboard() {
                   className="bg-purple-500/5 border-purple-500/15 text-white focus-visible:ring-purple-500/30" />
               </div>
             </div>
-
-            {/* Wilaya Selector */}
-            <div className="space-y-2">
-              <Label className="text-xs font-semibold uppercase tracking-wider text-purple-300">
-                <MapPin className="w-3 h-3 inline me-1 text-purple-400" />
-                {locale === 'ar' ? 'الولاية' : 'Wilaya'} *
-              </Label>
-              <div className="relative" ref={wilayaDropdownRef}>
-                <button
-                  type="button"
-                  onClick={() => { setShowWilayaDropdown(!showWilayaDropdown); setWilayaSearch(''); }}
-                  className={cn(
-                    'w-full flex items-center justify-between px-3 py-2.5 rounded-xl text-sm transition-all duration-200 border',
-                    'bg-purple-500/5 border-purple-500/15 text-white hover:border-purple-500/30 focus-visible:ring-2 focus-visible:ring-purple-500/30',
-                    !serviceForm.wilaya && 'text-muted-foreground',
-                  )}
-                >
-                  <span>
-                    {serviceForm.wilaya
-                      ? `${getWilayaName(serviceForm.wilaya, locale)} (${serviceForm.wilaya})`
-                      : (locale === 'ar' ? 'اختر ولاية...' : 'Select wilaya...')}
-                  </span>
-                  {serviceForm.wilaya && (
-                    <span
-                      role="button"
-                      onClick={(e) => { e.stopPropagation(); setServiceForm({ ...serviceForm, wilaya: '' }); setWilayaSearch(''); }}
-                      className="text-muted-foreground hover:text-white me-2"
-                    >
-                      <X className="w-3.5 h-3.5" />
-                    </span>
-                  )}
-                  <ChevronDown className={cn('w-4 h-4 text-muted-foreground transition-transform', showWilayaDropdown && 'rotate-180')} />
-                </button>
-                {showWilayaDropdown && (
-                  <div className="absolute z-50 mt-2 w-full rounded-xl glass border border-purple-500/15 bg-gray-950/98 shadow-2xl shadow-purple-500/10 overflow-hidden">
-                    <div className="p-2 border-b border-purple-500/10">
-                      <div className="relative">
-                        <input
-                          autoFocus
-                          type="text"
-                          placeholder={locale === 'ar' ? 'ابحث عن ولاية...' : 'Search wilaya...'}
-                          value={wilayaSearch}
-                          onChange={(e) => setWilayaSearch(e.target.value)}
-                          className="w-full bg-purple-500/5 border border-purple-500/15 rounded-lg px-3 py-2 text-sm text-white placeholder:text-muted-foreground focus:outline-none focus:border-purple-500/30"
-                        />
-                        {wilayaSearch && (
-                          <button type="button" onClick={() => setWilayaSearch('')}
-                            className="absolute end-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-white">
-                            <X className="w-3.5 h-3.5" />
-                          </button>
-                        )}
-                      </div>
-                    </div>
-                    <ScrollArea className="max-h-56">
-                      <div className="p-1">
-                        {searchWilayas(wilayaSearch).map((w) => {
-                          const isActive = serviceForm.wilaya === w.code;
-                          return (
-                            <button
-                              key={w.code}
-                              type="button"
-                              onClick={() => {
-                                setServiceForm({ ...serviceForm, wilaya: w.code });
-                                setShowWilayaDropdown(false);
-                                setWilayaSearch('');
-                              }}
-                              className={cn(
-                                'w-full flex items-center justify-between px-3 py-2 rounded-lg text-sm transition-colors',
-                                isActive ? 'bg-purple-500/20 text-purple-300' : 'text-white/80 hover:bg-purple-500/10 hover:text-white',
-                              )}
-                            >
-                              <span>{locale === 'ar' ? w.nameAr : w.nameEn}</span>
-                              <span className="text-xs text-muted-foreground ms-2">{w.code}</span>
-                            </button>
-                          );
-                        })}
-                        {searchWilayas(wilayaSearch).length === 0 && (
-                          <p className="text-center text-sm text-muted-foreground py-4">
-                            {locale === 'ar' ? 'لم يتم العثور على ولاية' : 'No wilaya found'}
-                          </p>
-                        )}
-                      </div>
-                    </ScrollArea>
-                  </div>
-                )}
-              </div>
-            </div>
-
-            {/* Location, MaxPeople, Image */}
+            <WilayaDropdown value={serviceForm.wilaya} onChange={(v) => setServiceForm({ ...serviceForm, wilaya: v })} />
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
               <div className="space-y-2">
                 <Label className="text-xs font-semibold uppercase tracking-wider text-purple-300">{t('serviceLocation')}</Label>
@@ -861,11 +870,9 @@ export default function ProviderDashboard() {
                   placeholder="https://..." className="bg-purple-500/5 border-purple-500/15 text-white focus-visible:ring-purple-500/30" />
               </div>
             </div>
-
-            {/* Save */}
             <div className="flex justify-end pt-2">
               <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
-                onClick={handleSaveService} disabled={savingService}
+                onClick={() => handleSaveService(false)} disabled={savingService}
                 className="btn-purple-gradient btn-shimmer px-6 py-2.5 rounded-xl text-sm font-semibold disabled:opacity-50 flex items-center gap-2">
                 {savingService && <Loader2 className="w-4 h-4 animate-spin" />}
                 {t('save')}
@@ -894,6 +901,154 @@ export default function ProviderDashboard() {
     </motion.div>
   );
 
+  // ── Add Service Tab (Full Page) ──────────────────────────────────────────
+
+  const renderAddServiceTab = () => (
+    <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} className="space-y-6 max-w-3xl mx-auto">
+      {/* Header */}
+      <div className="flex items-center gap-3">
+        <div className="w-12 h-12 rounded-xl bg-gradient-to-br from-purple-600 to-purple-800 flex items-center justify-center shadow-lg shadow-purple-500/20">
+          <Plus className="w-6 h-6 text-white" />
+        </div>
+        <div>
+          <h2 className="text-xl font-bold text-white">{locale === 'ar' ? 'إضافة خدمة جديدة' : 'Add New Service'}</h2>
+          <p className="text-sm text-muted-foreground">{locale === 'ar' ? 'أدخل تفاصيل الخدمة الجديدة' : 'Enter the new service details'}</p>
+        </div>
+      </div>
+
+      {/* Form */}
+      <div className="glass rounded-2xl p-6 border border-purple-500/10 space-y-6">
+        {/* Bilingual Titles */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label className="text-xs font-semibold uppercase tracking-wider text-purple-300">
+              {t('serviceTitle')} ({locale === 'ar' ? 'العربية' : 'Arabic'}) *
+            </Label>
+            <Input value={serviceForm.titleAr} onChange={(e) => setServiceForm({ ...serviceForm, titleAr: e.target.value })}
+              placeholder={locale === 'ar' ? 'عنوان الخدمة بالعربية' : 'Title in Arabic'} dir="rtl"
+              className="bg-purple-500/5 border-purple-500/15 text-white focus-visible:ring-purple-500/30" />
+          </div>
+          <div className="space-y-2">
+            <Label className="text-xs font-semibold uppercase tracking-wider text-purple-300">
+              {t('serviceTitle')} (English) *
+            </Label>
+            <Input value={serviceForm.titleEn} onChange={(e) => setServiceForm({ ...serviceForm, titleEn: e.target.value })}
+              placeholder="Title in English" dir="ltr"
+              className="bg-purple-500/5 border-purple-500/15 text-white focus-visible:ring-purple-500/30" />
+          </div>
+        </div>
+
+        {/* Bilingual Descriptions */}
+        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div className="space-y-2">
+            <Label className="text-xs font-semibold uppercase tracking-wider text-purple-300">{t('serviceDescription')} (AR)</Label>
+            <Textarea value={serviceForm.descriptionAr} onChange={(e) => setServiceForm({ ...serviceForm, descriptionAr: e.target.value })}
+              placeholder={locale === 'ar' ? 'وصف تفصيلي للخدمة بالعربية...' : 'Detailed description in Arabic...'} dir="rtl" rows={4}
+              className="bg-purple-500/5 border-purple-500/15 text-white focus-visible:ring-purple-500/30" />
+          </div>
+          <div className="space-y-2">
+            <Label className="text-xs font-semibold uppercase tracking-wider text-purple-300">{t('serviceDescription')} (EN)</Label>
+            <Textarea value={serviceForm.descriptionEn} onChange={(e) => setServiceForm({ ...serviceForm, descriptionEn: e.target.value })}
+              placeholder="Detailed description in English..." dir="ltr" rows={4}
+              className="bg-purple-500/5 border-purple-500/15 text-white focus-visible:ring-purple-500/30" />
+          </div>
+        </div>
+
+        <Separator className="bg-purple-500/10" />
+
+        {/* Category, Price, Duration */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="space-y-2">
+            <Label className="text-xs font-semibold uppercase tracking-wider text-purple-300">{t('serviceCategory')} *</Label>
+            <Select value={serviceForm.categoryId} onValueChange={(v) => setServiceForm({ ...serviceForm, categoryId: v })}>
+              <SelectTrigger className="bg-purple-500/5 border-purple-500/15 text-white">
+                <SelectValue placeholder={locale === 'ar' ? 'اختر تصنيفاً' : 'Select category'} />
+              </SelectTrigger>
+              <SelectContent>
+                {categories.map(c => (
+                  <SelectItem key={c.id} value={c.id} className="text-white">{gt(c.nameAr, c.nameEn)}</SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2">
+            <Label className="text-xs font-semibold uppercase tracking-wider text-purple-300">{t('servicePrice')} ({t('dzd')}) *</Label>
+            <Input type="number" value={serviceForm.price} onChange={(e) => setServiceForm({ ...serviceForm, price: e.target.value })}
+              placeholder="0" className="bg-purple-500/5 border-purple-500/15 text-white focus-visible:ring-purple-500/30" />
+          </div>
+          <div className="space-y-2">
+            <Label className="text-xs font-semibold uppercase tracking-wider text-purple-300">{t('serviceDuration')} *</Label>
+            <Input value={serviceForm.duration} onChange={(e) => setServiceForm({ ...serviceForm, duration: e.target.value })}
+              placeholder={locale === 'ar' ? 'ساعتان' : '2 hours'}
+              className="bg-purple-500/5 border-purple-500/15 text-white focus-visible:ring-purple-500/30" />
+          </div>
+        </div>
+
+        {/* Wilaya */}
+        <WilayaDropdown value={serviceForm.wilaya} onChange={(v) => setServiceForm({ ...serviceForm, wilaya: v })} />
+
+        {/* Location, MaxPeople, Image */}
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="space-y-2">
+            <Label className="text-xs font-semibold uppercase tracking-wider text-purple-300">{t('serviceLocation')}</Label>
+            <Input value={serviceForm.location} onChange={(e) => setServiceForm({ ...serviceForm, location: e.target.value })}
+              placeholder={locale === 'ar' ? 'العنوان التفصيلي' : 'Detailed address'}
+              className="bg-purple-500/5 border-purple-500/15 text-white focus-visible:ring-purple-500/30" />
+          </div>
+          <div className="space-y-2">
+            <Label className="text-xs font-semibold uppercase tracking-wider text-purple-300">{t('maxPeople')}</Label>
+            <Input type="number" value={serviceForm.maxPeople} onChange={(e) => setServiceForm({ ...serviceForm, maxPeople: e.target.value })}
+              placeholder="1" className="bg-purple-500/5 border-purple-500/15 text-white focus-visible:ring-purple-500/30" />
+          </div>
+          <div className="space-y-2">
+            <Label className="text-xs font-semibold uppercase tracking-wider text-purple-300">{t('serviceImage')}</Label>
+            <Input value={serviceForm.image} onChange={(e) => setServiceForm({ ...serviceForm, image: e.target.value })}
+              placeholder="https://..." className="bg-purple-500/5 border-purple-500/15 text-white focus-visible:ring-purple-500/30" />
+          </div>
+        </div>
+
+        {/* Featured Toggle */}
+        <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-purple-500/5 border border-purple-500/10">
+          <button
+            type="button"
+            onClick={() => setServiceForm({ ...serviceForm, featured: !serviceForm.featured })}
+            className={cn(
+              'relative w-11 h-6 rounded-full transition-colors duration-200',
+              serviceForm.featured ? 'bg-purple-600' : 'bg-purple-500/20'
+            )}
+          >
+            <span className={cn(
+              'absolute top-0.5 w-5 h-5 rounded-full bg-white shadow-md transition-transform duration-200',
+              serviceForm.featured ? 'translate-x-5' : 'translate-x-0.5'
+            )} />
+          </button>
+          <div>
+            <p className="text-sm font-medium text-white">{locale === 'ar' ? 'خدمة مميزة' : 'Featured Service'}</p>
+            <p className="text-xs text-muted-foreground">{locale === 'ar' ? 'ستظهر في قسم الخدمات المميزة' : 'Will appear in featured services section'}</p>
+          </div>
+        </div>
+
+        <Separator className="bg-purple-500/10" />
+
+        {/* Actions */}
+        <div className="flex items-center justify-between">
+          <motion.button whileHover={{ scale: 1.02 }} whileTap={{ scale: 0.98 }}
+            onClick={() => { setActiveTab('services'); resetForm(); }}
+            className="px-5 py-2.5 rounded-xl text-sm font-semibold glass border border-purple-500/15 text-purple-400 hover:bg-purple-500/10 transition-all">
+            {t('cancel')}
+          </motion.button>
+          <motion.button whileHover={{ scale: 1.03 }} whileTap={{ scale: 0.97 }}
+            onClick={() => handleSaveService(true)} disabled={savingService}
+            className="btn-purple-gradient btn-shimmer px-8 py-2.5 rounded-xl text-sm font-semibold disabled:opacity-50 flex items-center gap-2">
+            {savingService && <Loader2 className="w-4 h-4 animate-spin" />}
+            <Plus className="w-4 h-4" />
+            {locale === 'ar' ? 'إضافة الخدمة' : 'Add Service'}
+          </motion.button>
+        </div>
+      </div>
+    </motion.div>
+  );
+
   // ── Bookings Tab ─────────────────────────────────────────────────────────
 
   const renderBookingsTab = () => (
@@ -903,7 +1058,6 @@ export default function ProviderDashboard() {
         {t('recentBookings')}
       </h2>
 
-      {/* Filter */}
       <div className="flex flex-wrap gap-2">
         {['all', 'pending', 'confirmed', 'completed', 'cancelled'].map(f => (
           <motion.button key={f} whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
@@ -979,7 +1133,7 @@ export default function ProviderDashboard() {
     </motion.div>
   );
 
-  // ── Messages Tab ─────────────────────────────────────────────────────────
+  // ── Messages Tab (Real-time) ─────────────────────────────────────────────
 
   const renderMessagesTab = () => (
     <motion.div initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }}
@@ -987,7 +1141,13 @@ export default function ProviderDashboard() {
       {/* Conversation List */}
       <div className={cn('w-72 border-e border-purple-500/10 flex flex-col flex-shrink-0', selectedConversation && 'hidden md:flex')}>
         <div className="p-4 border-b border-purple-500/10">
-          <h3 className="font-bold text-sm text-white">{locale === 'ar' ? 'المحادثات' : 'Conversations'}</h3>
+          <h3 className="font-bold text-sm text-white flex items-center gap-2">
+            <MessageSquare className="w-4 h-4 text-purple-400" />
+            {locale === 'ar' ? 'المحادثات' : 'Conversations'}
+            {conversations.length > 0 && (
+              <span className="text-[10px] bg-purple-500/20 text-purple-300 px-2 py-0.5 rounded-full">{conversations.length}</span>
+            )}
+          </h3>
         </div>
         <ScrollArea className="flex-1">
           {conversations.length === 0 ? (
@@ -1018,15 +1178,23 @@ export default function ProviderDashboard() {
                 <p className="text-sm font-semibold text-white truncate">{selectedConversation.user.name}</p>
                 <p className="text-xs text-muted-foreground truncate">{gt(selectedConversation.service.titleAr, selectedConversation.service.titleEn)}</p>
               </div>
+              <div className="ms-auto flex items-center gap-1">
+                <span className="w-2 h-2 rounded-full bg-emerald-500 animate-pulse" />
+                <span className="text-[10px] text-emerald-400">{locale === 'ar' ? 'مباشر' : 'Live'}</span>
+              </div>
             </div>
             <ScrollArea className="flex-1 p-4 space-y-3">
               {messages.length === 0 ? (
-                <p className="text-center text-sm text-muted-foreground py-8">{t('noData')}</p>
+                <div className="flex flex-col items-center justify-center py-12 text-center">
+                  <MessageSquare className="w-10 h-10 text-purple-500/20 mb-3" />
+                  <p className="text-sm text-muted-foreground">{locale === 'ar' ? 'ابدأ المحادثة بإرسال رسالة' : 'Start the conversation by sending a message'}</p>
+                </div>
               ) : (
                 messages.map(msg => {
                   const isMine = msg.senderId === user?.id;
                   return (
-                    <div key={msg.id} className={cn('flex', isMine ? 'justify-end' : 'justify-start')}>
+                    <motion.div key={msg.id} initial={{ opacity: 0, y: 8 }} animate={{ opacity: 1, y: 0 }}
+                      className={cn('flex', isMine ? 'justify-end' : 'justify-start')}>
                       <div className={cn('max-w-[75%] px-4 py-2.5 rounded-2xl text-sm',
                         isMine
                           ? 'bg-gradient-to-br from-purple-600 to-purple-700 text-white rounded-br-md shadow-lg shadow-purple-500/20'
@@ -1038,7 +1206,7 @@ export default function ProviderDashboard() {
                           {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                         </p>
                       </div>
-                    </div>
+                    </motion.div>
                   );
                 })
               )}
@@ -1048,12 +1216,12 @@ export default function ProviderDashboard() {
               <div className="flex gap-2">
                 <Input value={newMessage} onChange={e => setNewMessage(e.target.value)}
                   onKeyDown={e => e.key === 'Enter' && handleSendMessage()}
-                  placeholder={t('sendMessage')}
+                  placeholder={locale === 'ar' ? 'اكتب رسالتك...' : 'Type your message...'}
                   className="flex-1 bg-purple-500/5 border-purple-500/15 text-white placeholder:text-muted-foreground focus-visible:ring-purple-500/30" />
                 <motion.button whileHover={{ scale: 1.05 }} whileTap={{ scale: 0.95 }}
                   onClick={handleSendMessage} disabled={sendingMessage || !newMessage.trim()}
                   className="btn-purple-gradient btn-shimmer px-4 py-2.5 rounded-xl disabled:opacity-50">
-                  <Send className="w-4 h-4" />
+                  {sendingMessage ? <Loader2 className="w-4 h-4 animate-spin" /> : <Send className="w-4 h-4" />}
                 </motion.button>
               </div>
             </div>
@@ -1062,7 +1230,7 @@ export default function ProviderDashboard() {
           <div className="flex-1 flex items-center justify-center">
             <div className="text-center">
               <MessageSquare className="w-12 h-12 text-purple-500/20 mx-auto mb-3" />
-              <p className="text-muted-foreground text-sm">{locale === 'ar' ? 'اختر محادثة' : 'Select a conversation'}</p>
+              <p className="text-muted-foreground text-sm">{locale === 'ar' ? 'اختر محادثة لبدء المراسلة' : 'Select a conversation to start messaging'}</p>
             </div>
           </div>
         )}
@@ -1081,7 +1249,6 @@ export default function ProviderDashboard() {
 
       {provider ? (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-          {/* Provider Card */}
           <motion.div variants={staggerItem} initial="hidden" animate="visible" className="lg:col-span-1">
             <div className="glass rounded-2xl p-6 border border-purple-500/10 card-hover">
               <div className="flex flex-col items-center text-center">
@@ -1128,7 +1295,6 @@ export default function ProviderDashboard() {
             </div>
           </motion.div>
 
-          {/* Profile Details */}
           <motion.div variants={staggerItem} initial="hidden" animate="visible" className="lg:col-span-2">
             <div className="glass rounded-2xl p-6 border border-purple-500/10 space-y-4">
               <h3 className="font-bold text-white flex items-center gap-2 mb-4">
@@ -1241,47 +1407,61 @@ export default function ProviderDashboard() {
 
   return (
     <div className="min-h-screen bg-mesh-gradient">
-      {/* Mobile Top Bar */}
-      <div className="lg:hidden fixed top-0 inset-x-0 z-40 glass--scrolled border-b border-purple-500/10 px-4 py-3 flex items-center justify-between">
-        <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
-          <SheetTrigger asChild>
-            <Button variant="ghost" size="icon" className="text-purple-400 hover:bg-purple-500/10">
-              <Menu className="h-5 w-5" />
-            </Button>
-          </SheetTrigger>
-          <SheetContent side={isRTL ? 'right' : 'left'} className="w-72 p-0 glass border-purple-500/10 bg-gradient-to-b from-gray-900 to-purple-950/30">
-            <SheetTitle className="sr-only">Menu</SheetTitle>
-            {renderSidebarContent()}
-          </SheetContent>
-        </Sheet>
-        <div className="text-2xl font-black text-gradient-purple">H</div>
-        <Avatar className="h-8 w-8 ring-2 ring-purple-500/50">
-          <AvatarImage src={user?.avatar || undefined} />
-          <AvatarFallback className="bg-gradient-to-br from-purple-600 to-purple-800 text-white text-xs font-bold">
-            {user?.name?.charAt(0) || 'P'}
-          </AvatarFallback>
-        </Avatar>
+      {/* Top Bar - always visible, fixed */}
+      <div className="fixed top-0 inset-x-0 z-40 glass--scrolled border-b border-purple-500/10 px-4 py-3 flex items-center justify-between">
+        {/* Left side: Logo */}
+        <div className="flex items-center gap-3">
+          <div className="text-2xl font-black text-gradient-purple">H</div>
+          <span className="text-xs text-muted-foreground font-medium hidden sm:block">
+            {locale === 'ar' ? 'لوحة تحكم المزود' : 'Provider Dashboard'}
+          </span>
+        </div>
+
+        {/* Center: Current tab name */}
+        <div className="hidden md:flex items-center gap-2 text-sm text-purple-300 font-medium">
+          {navItems.find(n => n.id === activeTab) && (() => {
+            const CurrentIcon = navItems.find(n => n.id === activeTab)!.icon;
+            return <CurrentIcon className="w-4 h-4" />;
+          })()}
+          <span>{navItems.find(n => n.id === activeTab)?.label}</span>
+        </div>
+
+        {/* Right side: Avatar + Sidebar toggle */}
+        <div className="flex items-center gap-2">
+          <Avatar className="h-8 w-8 ring-2 ring-purple-500/50">
+            <AvatarImage src={user?.avatar || undefined} />
+            <AvatarFallback className="bg-gradient-to-br from-purple-600 to-purple-800 text-white text-xs font-bold">
+              {user?.name?.charAt(0) || 'P'}
+            </AvatarFallback>
+          </Avatar>
+          {/* Sidebar toggle button */}
+          <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
+            <SheetTrigger asChild>
+              <Button variant="ghost" size="icon" className="text-purple-400 hover:bg-purple-500/10">
+                <PanelRightOpen className="h-5 w-5" />
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="right" className="w-72 p-0 glass border-purple-500/10 bg-gradient-to-b from-gray-900 to-purple-950/30">
+              <SheetTitle className="sr-only">Navigation</SheetTitle>
+              {renderSidebarContent()}
+            </SheetContent>
+          </Sheet>
+        </div>
       </div>
 
-      <div className="flex">
-        {/* Desktop Sidebar */}
-        <aside className="hidden lg:block fixed top-0 left-0 bottom-0 w-72 z-30 glass border-e border-purple-500/10 bg-gradient-to-b from-gray-900 to-purple-950/30">
-            {renderSidebarContent()}
-        </aside>
-
-        {/* Main */}
-        <main className="flex-1 lg:ms-72 pt-20 lg:pt-0 min-h-screen">
-          <div className="max-w-6xl mx-auto p-4 sm:p-6 lg:p-8">
-            <AnimatePresence mode="wait">
-              {activeTab === 'analytics' && <motion.div key="analytics" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>{renderAnalyticsTab()}</motion.div>}
-              {activeTab === 'services' && <motion.div key="services" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>{renderServicesTab()}</motion.div>}
-              {activeTab === 'bookings' && <motion.div key="bookings" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>{renderBookingsTab()}</motion.div>}
-              {activeTab === 'messages' && <motion.div key="messages" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>{renderMessagesTab()}</motion.div>}
-              {activeTab === 'settings' && <motion.div key="settings" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>{renderSettingsTab()}</motion.div>}
-            </AnimatePresence>
-          </div>
-        </main>
-      </div>
+      {/* Main Content - full width */}
+      <main className="pt-20 min-h-screen">
+        <div className="max-w-6xl mx-auto p-4 sm:p-6 lg:p-8">
+          <AnimatePresence mode="wait">
+            {activeTab === 'analytics' && <motion.div key="analytics" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>{renderAnalyticsTab()}</motion.div>}
+            {activeTab === 'services' && <motion.div key="services" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>{renderServicesTab()}</motion.div>}
+            {activeTab === 'addService' && <motion.div key="addService" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>{renderAddServiceTab()}</motion.div>}
+            {activeTab === 'bookings' && <motion.div key="bookings" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>{renderBookingsTab()}</motion.div>}
+            {activeTab === 'messages' && <motion.div key="messages" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>{renderMessagesTab()}</motion.div>}
+            {activeTab === 'settings' && <motion.div key="settings" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }}>{renderSettingsTab()}</motion.div>}
+          </AnimatePresence>
+        </div>
+      </main>
     </div>
   );
 }
