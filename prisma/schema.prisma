@@ -9,58 +9,61 @@ datasource db {
 }
 
 model User {
-  id            String    @id @default(cuid())
-  email         String    @unique
-  name          String
-  password      String
-  role          String    @default("user") // "user" or "provider"
-  avatar        String?
-  phone         String?
-  wilaya        String?   // Algerian wilaya code
-  locale        String    @default("ar")
-  active        Boolean   @default(true) // Admin can deactivate users
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id        String   @id @default(cuid())
+  email     String   @unique
+  name      String
+  password  String
+  role      String   @default("user") // "user" or "provider"
+  avatar    String?
+  phone     String?
+  wilaya    String? // Algerian wilaya code
+  locale    String   @default("ar")
+  active    Boolean  @default(true) // Admin can deactivate users
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 
-  provider      Provider?
-  bookings      Booking[]
-  reviews       Review[]
-  messages      Message[]
-  complaints    Complaint[]
+  provider   Provider?
+  bookings   Booking[]
+  reviews    Review[]
+  messages   Message[]
+  complaints Complaint[]
 }
 
 model Provider {
-  id            String    @id @default(cuid())
-  userId        String    @unique
-  companyName   String
-  description   String?
-  wilaya        String?   // Algerian wilaya code
-  website       String?
-  rating        Float     @default(0)
-  totalReviews  Int       @default(0)
-  verified      Boolean   @default(false)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id           String   @id @default(cuid())
+  userId       String   @unique
+  categoryId   String?
+  companyName  String
+  description  String?
+  wilaya       String? // Algerian wilaya code
+  website      String?
+  rating       Float    @default(0)
+  totalReviews Int      @default(0)
+  verified     Boolean  @default(false)
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
 
-  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  services      Service[]
-  bookings      Booking[]
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  category Category? @relation(fields: [categoryId], references: [id])
+  services Service[]
+  bookings Booking[]
 }
 
 model Category {
-  id            String    @id @default(cuid())
-  nameAr        String
-  nameEn        String
-  icon          String
-  image         String?
-  sort          Int       @default(0)
-  createdAt     DateTime  @default(now())
+  id        String   @id @default(cuid())
+  nameAr    String
+  nameEn    String
+  icon      String
+  image     String?
+  sort      Int      @default(0)
+  createdAt DateTime @default(now())
 
-  services      Service[]
+  services  Service[]
+  providers Provider[]
 }
 
 model Service {
-  id            String    @id @default(cuid())
+  id            String   @id @default(cuid())
   providerId    String
   categoryId    String
   titleAr       String
@@ -68,81 +71,81 @@ model Service {
   descriptionAr String
   descriptionEn String
   price         Float
-  currency      String    @default("DZD")
-  duration      String    // e.g., "2 hours", "3 days"
-  maxPeople     Int       @default(1)
-  wilaya        String    // Algerian wilaya code
-  location      String    // Wilaya display name
+  currency      String   @default("DZD")
+  duration      String // e.g., "2 hours", "3 days"
+  maxPeople     Int      @default(1)
+  wilaya        String // Algerian wilaya code
+  location      String // Wilaya display name
   image         String?
-  images        String    @default("[]") // JSON array of image URLs
-  rating        Float     @default(0)
-  totalReviews  Int       @default(0)
-  totalBookings Int       @default(0)
-  active        Boolean   @default(true)
-  featured      Boolean   @default(false)
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  images        String   @default("[]") // JSON array of image URLs
+  rating        Float    @default(0)
+  totalReviews  Int      @default(0)
+  totalBookings Int      @default(0)
+  active        Boolean  @default(true)
+  featured      Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
 
-  provider      Provider  @relation(fields: [providerId], references: [id], onDelete: Cascade)
-  category      Category  @relation(fields: [categoryId], references: [id])
-  bookings      Booking[]
-  reviews       Review[]
+  provider Provider  @relation(fields: [providerId], references: [id], onDelete: Cascade)
+  category Category  @relation(fields: [categoryId], references: [id])
+  bookings Booking[]
+  reviews  Review[]
 }
 
 model Booking {
-  id            String    @id @default(cuid())
-  userId        String
-  serviceId     String
-  providerId    String
-  status        String    @default("pending") // pending, confirmed, cancelled, completed
-  bookingDate   DateTime
+  id             String   @id @default(cuid())
+  userId         String
+  serviceId      String
+  providerId     String
+  status         String   @default("pending") // pending, confirmed, cancelled, completed
+  bookingDate    DateTime
   numberOfPeople Int      @default(1)
-  totalPrice    Float
-  notes         String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  totalPrice     Float
+  notes          String?
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
 
-  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  service       Service   @relation(fields: [serviceId], references: [id])
-  provider      Provider  @relation(fields: [providerId], references: [id])
-  reviews       Review[]
-  messages      Message[]
+  user     User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  service  Service   @relation(fields: [serviceId], references: [id])
+  provider Provider  @relation(fields: [providerId], references: [id])
+  reviews  Review[]
+  messages Message[]
 }
 
 model Complaint {
-  id            String    @id @default(cuid())
-  userId        String
-  subject       String
-  content       String
-  status        String    @default("open")
-  adminReply    String?
-  createdAt     DateTime  @default(now())
-  updatedAt     DateTime  @updatedAt
+  id         String   @id @default(cuid())
+  userId     String
+  subject    String
+  content    String
+  status     String   @default("open")
+  adminReply String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
 
-  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 }
 
 model Review {
-  id            String    @id @default(cuid())
-  userId        String
-  serviceId     String
-  bookingId     String?
-  rating        Int       // 1-5
-  comment       String?
-  createdAt     DateTime  @default(now())
+  id        String   @id @default(cuid())
+  userId    String
+  serviceId String
+  bookingId String?
+  rating    Int // 1-5
+  comment   String?
+  createdAt DateTime @default(now())
 
-  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
-  service       Service   @relation(fields: [serviceId], references: [id])
-  booking       Booking?  @relation(fields: [bookingId], references: [id])
+  user    User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  service Service  @relation(fields: [serviceId], references: [id])
+  booking Booking? @relation(fields: [bookingId], references: [id])
 }
 
 model Message {
-  id            String    @id @default(cuid())
-  bookingId     String
-  senderId      String
-  content       String
-  createdAt     DateTime  @default(now())
+  id        String   @id @default(cuid())
+  bookingId String
+  senderId  String
+  content   String
+  createdAt DateTime @default(now())
 
-  booking       Booking   @relation(fields: [bookingId], references: [id])
-  sender        User      @relation(fields: [senderId], references: [id])
+  booking Booking @relation(fields: [bookingId], references: [id])
+  sender  User    @relation(fields: [senderId], references: [id])
 }

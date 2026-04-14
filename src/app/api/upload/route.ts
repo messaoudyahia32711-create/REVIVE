@@ -1,7 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server';
-import { writeFile, mkdir } from 'fs/promises';
-import { existsSync } from 'fs';
-import path from 'path';
+import { supabaseAdmin } from '@/lib/supabase';
 
 export async function POST(request: NextRequest) {
   try {
@@ -31,20 +29,25 @@ export async function POST(request: NextRequest) {
     const ext = file.name.split('.').pop() || 'png';
     const uniqueName = `${Date.now()}-${Math.random().toString(36).substring(2, 8)}.${ext}`;
 
-    // Ensure upload directory exists
-    const uploadDir = path.join(process.cwd(), 'public', 'uploads', 'services');
-    if (!existsSync(uploadDir)) {
-      await mkdir(uploadDir, { recursive: true });
+    // Upload to Supabase Storage
+    const { data, error } = await supabaseAdmin.storage
+      .from('services')
+      .upload(uniqueName, buffer, {
+        contentType: file.type,
+        upsert: false
+      });
+
+    if (error) {
+      console.error('Supabase upload error:', error);
+      return NextResponse.json({ error: 'Failed to upload to storage layer' }, { status: 500 });
     }
 
-    // Write file
-    const filePath = path.join(uploadDir, uniqueName);
-    await writeFile(filePath, buffer);
-
     // Return the public URL
-    const publicUrl = `/uploads/services/${uniqueName}`;
+    const { data: publicUrlData } = supabaseAdmin.storage
+      .from('services')
+      .getPublicUrl(uniqueName);
 
-    return NextResponse.json({ url: publicUrl, name: uniqueName, size: file.size, type: file.type }, { status: 201 });
+    return NextResponse.json({ url: publicUrlData.publicUrl, name: uniqueName, size: file.size, type: file.type }, { status: 201 });
   } catch (error) {
     console.error('Upload error:', error);
     return NextResponse.json({ error: 'Upload failed' }, { status: 500 });

@@ -67,6 +67,8 @@ interface ProviderProfile {
   wilaya: string | null; website: string | null; rating: number;
   totalReviews: number; verified: boolean; createdAt: string; updatedAt: string;
   user: { id: string; name: string; email: string; phone: string | null; avatar: string | null };
+  category?: { id: string; nameAr: string; nameEn: string; icon: string };
+  categoryId: string | null;
 }
 
 interface BookingItem {
@@ -153,6 +155,11 @@ export default function ProviderDashboard() {
   const [rejectDialogOpen, setRejectDialogOpen] = useState(false);
   const [rejectBookingId, setRejectBookingId] = useState<string | null>(null);
   const [rejectionReason, setRejectionReason] = useState('');
+
+  // ── Profile Edit State ───────────────────────────────────────────────────
+  const [profileDialogOpen, setProfileDialogOpen] = useState(false);
+  const [profileForm, setProfileForm] = useState({ companyName: '', description: '', wilaya: '', phone: '', website: '', categoryId: '', newCategoryName: '' });
+  const [savingProfile, setSavingProfile] = useState(false);
 
   const providerId = user?.providerId;
 
@@ -301,18 +308,34 @@ export default function ProviderDashboard() {
       const formData = new FormData();
       formData.append('file', file);
       const res = await fetch('/api/upload', { method: 'POST', body: formData });
+      
       if (res.ok) {
         const data = await res.json();
         setServiceForm(prev => ({ ...prev, image: data.url }));
         setImagePreview(data.url);
-        showToast(locale === 'ar' ? 'تم رفع الصورة' : 'Image uploaded', 'success');
+        
+        // Wait for image to visually load before showing success
+        const img = new Image();
+        img.src = data.url;
+        img.onload = () => {
+          setUploadingImage(false);
+          showToast(locale === 'ar' ? 'تم رفع الصورة' : 'Image uploaded', 'success');
+        };
+        img.onerror = () => {
+          setUploadingImage(false);
+          showToast(locale === 'ar' ? 'تم الرفع، لكن تعذر المعاينة' : 'Uploaded, but preview failed', 'warning');
+        }
       } else {
-        showToast(locale === 'ar' ? 'فشل رفع الصورة' : 'Upload failed', 'error');
+        const errData = await res.json().catch(() => ({}));
+        console.error('Upload Error Data:', errData);
+        showToast(locale === 'ar' ? `فشل الرفع: ${errData.error || res.statusText}` : `Upload failed: ${errData.error || res.statusText}`, 'error');
+        setUploadingImage(false);
       }
-    } catch {
-      showToast(locale === 'ar' ? 'خطأ في رفع الصورة' : 'Upload error', 'error');
+    } catch (err) {
+      console.error('Upload Exception:', err);
+      showToast(locale === 'ar' ? 'خطأ في الاتصال بالخادم' : 'Server connection error', 'error');
+      setUploadingImage(false);
     }
-    setUploadingImage(false);
   };
 
   // ── Service CRUD ─────────────────────────────────────────────────────────
@@ -478,6 +501,49 @@ export default function ProviderDashboard() {
       if (res.ok) { setNewMessage(''); fetchMessages(selectedConversation.id); }
     } catch { showToast(locale === 'ar' ? 'فشل الإرسال' : 'Send failed', 'error'); }
     setSendingMessage(false);
+  };
+
+  // ── Profile API ──────────────────────────────────────────────────────────
+
+  const openEditProfile = () => {
+    if (!provider) return;
+    setProfileForm({
+      companyName: provider.companyName || '',
+      description: provider.description || '',
+      wilaya: provider.wilaya || '',
+      phone: provider.user.phone || '',
+      website: provider.website || '',
+      categoryId: provider.categoryId || '',
+      newCategoryName: ''
+    });
+    setProfileDialogOpen(true);
+  };
+
+  const handleSaveProfile = async () => {
+    if (!providerId) return;
+    if (profileForm.categoryId === 'other' && !profileForm.newCategoryName.trim()) {
+      showToast(locale === 'ar' ? 'يرجى كتابة اسم التخصص' : 'Please enter category name', 'error');
+      return;
+    }
+    setSavingProfile(true);
+    try {
+      const res = await fetch(`/api/providers/${providerId}`, {
+        method: 'PATCH',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(profileForm)
+      });
+      if (res.ok) {
+        showToast(locale === 'ar' ? 'تم تحديث الملف الشخصي' : 'Profile updated', 'success');
+        setProfileDialogOpen(false);
+        fetchProvider();
+        fetchCategories();
+      } else {
+        showToast(locale === 'ar' ? 'فشل التحديث' : 'Update failed', 'error');
+      }
+    } catch {
+      showToast(locale === 'ar' ? 'خطأ' : 'Error', 'error');
+    }
+    setSavingProfile(false);
   };
 
   // ═══════════════════════════════════════════════════════════════════════
@@ -1350,12 +1416,17 @@ export default function ProviderDashboard() {
       </h1>
       {provider ? (
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
-          <div className="rounded-xl border border-purple-500/10 bg-[#0f0f1a]/80 p-5 flex flex-col items-center text-center">
+          <div className="rounded-xl border border-purple-500/10 bg-[#0f0f1a]/80 p-5 flex flex-col items-center text-center relative">
             <Avatar className="h-20 w-20 ring-4 ring-purple-500/20 mb-3">
               <AvatarImage src={provider.user.avatar || undefined} />
               <AvatarFallback className="bg-gradient-to-br from-purple-600 to-purple-800 text-white text-2xl font-bold">{provider.user.name.charAt(0)}</AvatarFallback>
             </Avatar>
-            <h3 className="font-bold text-white">{provider.companyName}</h3>
+            <h3 className="font-bold text-white mb-1.5">{provider.companyName}</h3>
+            {provider.category && (
+              <Badge className="mb-2 bg-purple-500/20 text-purple-300 border-purple-500/30">
+                {gt(provider.category.nameAr, provider.category.nameEn)}
+              </Badge>
+            )}
             <p className="text-sm text-white/30 mt-0.5">{provider.user.email}</p>
             {provider.wilaya && <p className="text-xs text-purple-400 mt-2 flex items-center gap-1"><MapPin className="w-3 h-3" /> {getWilayaName(provider.wilaya, locale)}</p>}
             <div className="flex items-center gap-1 mt-2 text-amber-400"><Star className="w-4 h-4 fill-current" /><span className="text-sm font-bold">{provider.rating.toFixed(1)}</span><span className="text-xs text-white/30 ms-1">({provider.totalReviews})</span></div>
@@ -1364,7 +1435,12 @@ export default function ProviderDashboard() {
             </Badge>
           </div>
           <div className="lg:col-span-2 rounded-xl border border-purple-500/10 bg-[#0f0f1a]/80 p-5">
-            <h3 className="text-sm font-semibold text-white mb-4 flex items-center gap-2"><Building2 className="w-4 h-4 text-purple-400" /> {locale === 'ar' ? 'معلومات الحساب' : 'Account Info'}</h3>
+            <div className="flex items-center justify-between mb-4">
+              <h3 className="text-sm font-semibold text-white flex items-center gap-2"><Building2 className="w-4 h-4 text-purple-400" /> {locale === 'ar' ? 'معلومات الحساب' : 'Account Info'}</h3>
+              <Button size="sm" variant="outline" className="bg-white/5 border-purple-500/20 text-purple-300 hover:bg-purple-500/10" onClick={openEditProfile}>
+                <Pencil className="w-3.5 h-3.5 mr-1" /> {locale === 'ar' ? 'تعديل' : 'Edit'}
+              </Button>
+            </div>
             <div className="grid grid-cols-2 gap-3">
               {[{ l: locale === 'ar' ? 'الشركة' : 'Company', v: provider.companyName }, { l: locale === 'ar' ? 'الاسم' : 'Name', v: provider.user.name }, { l: locale === 'ar' ? 'البريد' : 'Email', v: provider.user.email }, { l: locale === 'ar' ? 'الهاتف' : 'Phone', v: provider.user.phone || '—' }, { l: locale === 'ar' ? 'الولاية' : 'Wilaya', v: provider.wilaya ? getWilayaName(provider.wilaya, locale) : '—' }].map((f, i) => (
                 <div key={i} className="px-3 py-2.5 rounded-lg bg-white/[0.02] border border-purple-500/10">
@@ -1380,6 +1456,71 @@ export default function ProviderDashboard() {
       ) : (
         <div className="flex items-center justify-center py-16"><Loader2 className="w-6 h-6 text-purple-400 animate-spin" /></div>
       )}
+
+      {/* Edit Profile Dialog */}
+      <Dialog open={profileDialogOpen} onOpenChange={setProfileDialogOpen}>
+        <DialogContent className="bg-[#0f0f1a] border-purple-500/20 text-white sm:max-w-[500px]">
+          <DialogHeader>
+            <DialogTitle>{locale === 'ar' ? 'تعديل الملف الشخصي' : 'Edit Profile'}</DialogTitle>
+          </DialogHeader>
+          <div className="space-y-4 py-2">
+            <div className="space-y-1.5">
+              <Label className="text-xs text-purple-300">{locale === 'ar' ? 'اسم العيادة / الشركة' : 'Company Name'}</Label>
+              <Input value={profileForm.companyName} onChange={e => setProfileForm(f => ({ ...f, companyName: e.target.value }))} className="bg-white/5 border-purple-500/20" />
+            </div>
+
+            <div className="space-y-1.5">
+              <Label className="text-xs text-purple-300">{locale === 'ar' ? 'التخصص الرئيسي' : 'Main Specialty'}</Label>
+              <Select value={profileForm.categoryId} onValueChange={v => setProfileForm(f => ({ ...f, categoryId: v }))}>
+                <SelectTrigger className="bg-white/5 border-purple-500/20 text-white">
+                  <SelectValue placeholder={locale === 'ar' ? 'اختر التخصص...' : 'Select Specialty...'} />
+                </SelectTrigger>
+                <SelectContent>
+                  {categories.map(c => (
+                    <SelectItem key={c.id} value={c.id} className="text-white">{gt(c.nameAr, c.nameEn)}</SelectItem>
+                  ))}
+                  <SelectItem value="other" className="text-purple-300 font-bold border-t border-purple-500/10 mt-1 pt-1 opacity-100 data-[highlighted]:bg-purple-500/20 hover:bg-purple-500/20">
+                    <Plus className="w-3.5 h-3.5 mr-2 inline" /> {locale === 'ar' ? 'آخر (غير موجود)' : 'Other (Not Listed)'}
+                  </SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
+
+            {profileForm.categoryId === 'other' && (
+              <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} className="space-y-1.5 pt-1">
+                <Label className="text-xs text-emerald-400">{locale === 'ar' ? 'أدخل التخصص الجديد' : 'Enter New Specialty'}</Label>
+                <Input value={profileForm.newCategoryName} autoFocus onChange={e => setProfileForm(f => ({ ...f, newCategoryName: e.target.value }))} className="bg-white/5 border-emerald-500/30 ring-emerald-500/20" placeholder={locale === 'ar' ? 'مثال: طب الأطفال...' : 'e.g., Pediatrics...'} />
+              </motion.div>
+            )}
+
+            <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <Label className="text-xs text-purple-300">{locale === 'ar' ? 'رقم الهاتف' : 'Phone'}</Label>
+                <Input value={profileForm.phone} onChange={e => setProfileForm(f => ({ ...f, phone: e.target.value }))} className="bg-white/5 border-purple-500/20" dir="ltr" />
+              </div>
+              <div className="space-y-1.5">
+                <Label className="text-xs text-purple-300">{locale === 'ar' ? 'الموقع الإلكتروني' : 'Website'}</Label>
+                <Input value={profileForm.website} onChange={e => setProfileForm(f => ({ ...f, website: e.target.value }))} className="bg-white/5 border-purple-500/20" dir="ltr" />
+              </div>
+            </div>
+
+            {/* In a Dialog, we don't want the complex Wilaya picker so we just use an Input or a simple picker. I'll use the renderWilayaField helper! */}
+            <div className="pt-2">
+              {renderWilayaField(profileForm.wilaya, v => setProfileForm(f => ({ ...f, wilaya: v })))}
+            </div>
+
+            <div className="space-y-1.5 pt-2">
+              <Label className="text-xs text-purple-300">{locale === 'ar' ? 'وصف' : 'Description'}</Label>
+              <Textarea value={profileForm.description} onChange={e => setProfileForm(f => ({ ...f, description: e.target.value }))} rows={3} className="bg-white/5 border-purple-500/20 text-sm" />
+            </div>
+
+            <Button className="w-full mt-4 bg-purple-600 hover:bg-purple-500 text-white" disabled={savingProfile} onClick={handleSaveProfile}>
+              {savingProfile ? <Loader2 className="w-4 h-4 mr-2 animate-spin" /> : null}
+              {locale === 'ar' ? 'تحديث البيانات' : 'Update Info'}
+            </Button>
+          </div>
+        </DialogContent>
+      </Dialog>
     </motion.div>
   );
 

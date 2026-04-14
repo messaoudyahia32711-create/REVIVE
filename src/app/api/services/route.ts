@@ -70,7 +70,15 @@ export async function GET(request: NextRequest) {
       ...(isPaginated && { skip: (page - 1) * limit, take: limit }),
       include: {
         provider: {
-          select: { id: true, companyName: true, rating: true, verified: true },
+          select: { 
+            id: true, 
+            companyName: true, 
+            rating: true, 
+            verified: true,
+            category: {
+              select: { nameAr: true, nameEn: true, icon: true }
+            }
+          },
         },
         category: {
           select: { id: true, nameAr: true, nameEn: true, icon: true },

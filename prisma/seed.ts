@@ -106,68 +106,7 @@ async function main() {
   console.log(`  ✓ Created 7 users\n`);
 
   // ─────────────────────────────────────────────
-  // 2. PROVIDERS (4 total)
-  // ─────────────────────────────────────────────
-  console.log("🏥 Creating providers...");
-
-  const provider1 = await prisma.provider.create({
-    data: {
-      userId: provider1User.id,
-      companyName: "مركز الصحة الطبيعي",
-      description:
-        "مركز متخصص في تقديم خدمات الرعاية الصحية الشاملة والعلاج الطبيعي في الجزائر العاصمة. نضم فريقاً من الأطباء المتخصصين ذوي الخبرة العالية في مختلف المجالات الطبية. نسعى لتقديم أفضل تجربة علاجية لمرضانا بأحدث التقنيات والمعدات الطبية.",
-      wilaya: "16",
-      website: "https://natural-health.dz",
-      rating: 2.8,
-      totalReviews: 3,
-      verified: true,
-    },
-  });
-
-  const provider2 = await prisma.provider.create({
-    data: {
-      userId: provider2User.id,
-      companyName: "عيادة الشفاء",
-      description:
-        "عيادة طبية متقدمة في مدينة قسنطينة تقدم خدمات طبية متنوعة تشمل الجلدية والعيون وأمراض القلب. نفتخر بفريق طبي متميز وبمعدات حديثة لضمان تشخيص دقيق وعلاج فعّال. نحرص على راحة المريض وتوفير بيئة علاجية مريحة وآمنة.",
-      wilaya: "25",
-      website: "https://al-shifa-clinic.dz",
-      rating: 1.3,
-      totalReviews: 1,
-      verified: true,
-    },
-  });
-
-  const provider3 = await prisma.provider.create({
-    data: {
-      userId: provider3User.id,
-      companyName: "عيادة العظام والمفاصل المتخصصة",
-      description: "عيادة متخصصة في جراحة العظام والمفاصل والعمود الفقري ومعالجة الإصابات الرياضية وتغيير المفاصل. نعتمد على أحدث التقنيات الجراحية والمناظير لضمان سرعة الشفاء.",
-      wilaya: "31",
-      website: "https://mansouri-ortho.dz",
-      rating: 4.9,
-      totalReviews: 15,
-      verified: true,
-    },
-  });
-
-  const provider4 = await prisma.provider.create({
-    data: {
-      userId: provider4User.id,
-      companyName: "منتجع ومصحة حمام ريغة للمياه المعدنية",
-      description: "أعرق منتجع للمياه المعدنية الحارة في الجزائر، يقدم خدمات العلاج بالمياه المعدنية للاستشفاء من أمراض الروماتيزم والأمراض الجلدية بالإضافة للتأهيل الحركي في بيئة طبيعية خلابة.",
-      wilaya: "44",
-      website: "https://hammam-righa.dz",
-      rating: 4.8,
-      totalReviews: 42,
-      verified: true,
-    },
-  });
-
-  console.log(`  ✓ Created 4 providers\n`);
-
-  // ─────────────────────────────────────────────
-  // 3. CATEGORIES (10 total)
+  // 2. CATEGORIES (10 total)
   // ─────────────────────────────────────────────
   console.log("📂 Creating categories...");
 
@@ -268,6 +207,72 @@ async function main() {
   ] = categories;
 
   console.log(`  ✓ Created 10 categories\n`);
+
+  // ─────────────────────────────────────────────
+  // 3. PROVIDERS (4 total)
+  // ─────────────────────────────────────────────
+  console.log("🏥 Creating providers...");
+
+  const provider1 = await prisma.provider.create({
+    data: {
+      userId: provider1User.id,
+      categoryId: catGeneralMedicine.id,
+      companyName: "مركز الصحة الطبيعي",
+      description:
+        "مركز متخصص في تقديم خدمات الرعاية الصحية الشاملة والعلاج الطبيعي في الجزائر العاصمة. نضم فريقاً من الأطباء المتخصصين ذوي الخبرة العالية في مختلف المجالات الطبية. نسعى لتقديم أفضل تجربة علاجية لمرضانا بأحدث التقنيات والمعدات الطبية.",
+      wilaya: "16",
+      website: "https://natural-health.dz",
+      rating: 2.8,
+      totalReviews: 3,
+      verified: true,
+    },
+  });
+
+  const provider2 = await prisma.provider.create({
+    data: {
+      userId: provider2User.id,
+      categoryId: catDermatology.id,
+      companyName: "عيادة الشفاء",
+      description:
+        "عيادة طبية متقدمة في مدينة قسنطينة تقدم خدمات طبية متنوعة تشمل الجلدية والعيون وأمراض القلب. نفتخر بفريق طبي متميز وبمعدات حديثة لضمان تشخيص دقيق وعلاج فعّال. نحرص على راحة المريض وتوفير بيئة علاجية مريحة وآمنة.",
+      wilaya: "25",
+      website: "https://al-shifa-clinic.dz",
+      rating: 1.3,
+      totalReviews: 1,
+      verified: true,
+    },
+  });
+
+  const provider3 = await prisma.provider.create({
+    data: {
+      userId: provider3User.id,
+      categoryId: catOrthopedics.id,
+      companyName: "عيادة العظام والمفاصل المتخصصة",
+      description: "عيادة متخصصة في جراحة العظام والمفاصل والعمود الفقري ومعالجة الإصابات الرياضية وتغيير المفاصل. نعتمد على أحدث التقنيات الجراحية والمناظير لضمان سرعة الشفاء.",
+      wilaya: "31",
+      website: "https://mansouri-ortho.dz",
+      rating: 4.9,
+      totalReviews: 15,
+      verified: true,
+    },
+  });
+
+  const provider4 = await prisma.provider.create({
+    data: {
+      userId: provider4User.id,
+      categoryId: catThermalTherapy.id,
+      companyName: "منتجع ومصحة حمام ريغة للمياه المعدنية",
+      description: "أعرق منتجع للمياه المعدنية الحارة في الجزائر، يقدم خدمات العلاج بالمياه المعدنية للاستشفاء من أمراض الروماتيزم والأمراض الجلدية بالإضافة للتأهيل الحركي في بيئة طبيعية خلابة.",
+      wilaya: "44",
+      website: "https://hammam-righa.dz",
+      rating: 4.8,
+      totalReviews: 42,
+      verified: true,
+    },
+  });
+
+  console.log(`  ✓ Created 4 providers\n`);
+
 
   // ─────────────────────────────────────────────
   // 4. SERVICES (12 total)

@@ -30,7 +30,7 @@ interface Service {
   rating: number;
   totalReviews: number;
   featured: boolean;
-  provider: { id: string; companyName: string; rating: number; verified: boolean };
+  provider: { id: string; companyName: string; rating: number; verified: boolean; category?: { nameAr: string; nameEn: string; icon: string } | null };
   category: { id: string; nameAr: string; nameEn: string; icon: string };
 }
 
@@ -765,18 +765,22 @@ export default function ServicesPage() {
                       )}
 
                       {/* Provider strip at bottom of image */}
-                      <div className="absolute bottom-0 inset-x-0 px-4 py-2 bg-gradient-to-t from-[#0a0a0f]/90 to-transparent flex items-center gap-2">
-                        <div className="w-6 h-6 rounded-full bg-gradient-to-br from-purple-600 to-purple-800 flex items-center justify-center text-white text-[9px] font-bold ring-1 ring-purple-500/30">
+                      <div className="absolute bottom-0 inset-x-0 px-3 py-2 bg-gradient-to-t from-[#0a0a0f]/90 via-[#0a0a0f]/60 to-transparent flex items-center gap-2">
+                        <div className="w-7 h-7 rounded-full flex-shrink-0 bg-gradient-to-br from-purple-600 to-purple-800 flex items-center justify-center text-white text-[10px] font-bold ring-2 ring-purple-500/20 shadow-lg shadow-black/50">
                           {service.provider.companyName.charAt(0)}
                         </div>
-                        <span className="text-[11px] text-white/80 font-medium truncate flex-1">
-                          {service.provider.companyName}
-                        </span>
-                        {service.provider.verified && (
-                          <span className="text-[9px] text-purple-300 font-semibold flex items-center gap-0.5">
-                            ✓
+                        <div className="flex flex-col flex-1 min-w-0">
+                          <span className="text-[11px] text-white/90 font-bold truncate flex items-center gap-1">
+                            {service.provider.companyName}
+                            {service.provider.verified && <span className="text-emerald-400 text-[9px] font-bold">✓</span>}
                           </span>
-                        )}
+                          {service.provider.category && (
+                            <span className="text-[9px] text-purple-300/80 truncate font-medium flex items-center gap-1">
+                              {getCategoryIcon(service.provider.category.icon)}
+                              {locale === 'ar' ? service.provider.category.nameAr : service.provider.category.nameEn}
+                            </span>
+                          )}
+                        </div>
                       </div>
                     </div>
 
