@@ -15,7 +15,7 @@ async function main() {
   await prisma.user.deleteMany();
 
   // ─────────────────────────────────────────────
-  // 1. USERS (5 total: 2 patients + 2 providers + 1 admin)
+  // 1. USERS (7 total: 2 patients + 4 providers + 1 admin)
   // ─────────────────────────────────────────────
   console.log("👤 Creating users...");
 
@@ -79,10 +79,34 @@ async function main() {
     },
   });
 
-  console.log(`  ✓ Created 5 users\n`);
+  const provider3User = await prisma.user.create({
+    data: {
+      email: "provider3@h.dz",
+      name: "د. ياسين منصوري",
+      password: "123456",
+      role: "provider",
+      phone: "+213555100003",
+      wilaya: "31",
+      locale: "ar",
+    },
+  });
+
+  const provider4User = await prisma.user.create({
+    data: {
+      email: "provider4@h.dz",
+      name: "المركب المعدني حمام ريغة",
+      password: "123456",
+      role: "provider",
+      phone: "+213555100004",
+      wilaya: "44",
+      locale: "ar",
+    },
+  });
+
+  console.log(`  ✓ Created 7 users\n`);
 
   // ─────────────────────────────────────────────
-  // 2. PROVIDERS (2 total)
+  // 2. PROVIDERS (4 total)
   // ─────────────────────────────────────────────
   console.log("🏥 Creating providers...");
 
@@ -114,10 +138,36 @@ async function main() {
     },
   });
 
-  console.log(`  ✓ Created 2 providers\n`);
+  const provider3 = await prisma.provider.create({
+    data: {
+      userId: provider3User.id,
+      companyName: "عيادة العظام والمفاصل المتخصصة",
+      description: "عيادة متخصصة في جراحة العظام والمفاصل والعمود الفقري ومعالجة الإصابات الرياضية وتغيير المفاصل. نعتمد على أحدث التقنيات الجراحية والمناظير لضمان سرعة الشفاء.",
+      wilaya: "31",
+      website: "https://mansouri-ortho.dz",
+      rating: 4.9,
+      totalReviews: 15,
+      verified: true,
+    },
+  });
+
+  const provider4 = await prisma.provider.create({
+    data: {
+      userId: provider4User.id,
+      companyName: "منتجع ومصحة حمام ريغة للمياه المعدنية",
+      description: "أعرق منتجع للمياه المعدنية الحارة في الجزائر، يقدم خدمات العلاج بالمياه المعدنية للاستشفاء من أمراض الروماتيزم والأمراض الجلدية بالإضافة للتأهيل الحركي في بيئة طبيعية خلابة.",
+      wilaya: "44",
+      website: "https://hammam-righa.dz",
+      rating: 4.8,
+      totalReviews: 42,
+      verified: true,
+    },
+  });
+
+  console.log(`  ✓ Created 4 providers\n`);
 
   // ─────────────────────────────────────────────
-  // 3. CATEGORIES (9 total)
+  // 3. CATEGORIES (10 total)
   // ─────────────────────────────────────────────
   console.log("📂 Creating categories...");
 
@@ -194,6 +244,14 @@ async function main() {
         sort: 9,
       },
     }),
+    prisma.category.create({
+      data: {
+        nameAr: "العلاج بالمياه المعدنية",
+        nameEn: "Thermal Therapy",
+        icon: "Droplets",
+        sort: 10,
+      },
+    }),
   ]);
 
   const [
@@ -206,12 +264,13 @@ async function main() {
     catCardiology,
     catOrthopedics,
     catNutrition,
+    catThermalTherapy,
   ] = categories;
 
-  console.log(`  ✓ Created 9 categories\n`);
+  console.log(`  ✓ Created 10 categories\n`);
 
   // ─────────────────────────────────────────────
-  // 4. SERVICES (8 total)
+  // 4. SERVICES (12 total)
   // ─────────────────────────────────────────────
   console.log("🩺 Creating services...");
 
@@ -423,6 +482,102 @@ async function main() {
         featured: true,
       },
     }),
+
+    // Service 9: Orthopedic Surgery Consultation (Provider 3, Orthopedics)
+    prisma.service.create({
+      data: {
+        providerId: provider3.id,
+        categoryId: catOrthopedics.id,
+        titleAr: "استشارة جراحة العظام",
+        titleEn: "Orthopedic Consultation",
+        descriptionAr: "فحص شامل وإجراء الأشعة السينية وتشخيص أمراض المفاصل والعظام. يتم تقديم أفضل التوصيات والخطة العلاجية أو الجراحية إذا لزم الأمر من قبل البروفيسور.",
+        descriptionEn: "Comprehensive physical examination with X-rays to diagnose bone and joint diseases. The best recommendations and medical or surgical plans are provided.",
+        price: 4000,
+        currency: "DZD",
+        duration: "30 min",
+        maxPeople: 1,
+        wilaya: "31",
+        location: "وهران",
+        images: JSON.stringify([]),
+        rating: 5,
+        totalReviews: 2,
+        totalBookings: 8,
+        active: true,
+        featured: true,
+      },
+    }),
+
+    // Service 10: Sports Injury Treatment (Provider 3, Orthopedics)
+    prisma.service.create({
+      data: {
+        providerId: provider3.id,
+        categoryId: catOrthopedics.id,
+        titleAr: "علاج الإصابات الرياضية",
+        titleEn: "Sports Injury Treatment",
+        descriptionAr: "علاج متخصص للرياضيين يشمل تمزق الأربطة، خلع المفاصل، ومشاكل العضلات باستخدام الحقن الموضعية والتأهيل المتقدم.",
+        descriptionEn: "Specialized treatment for athletes including torn ligaments, dislocations, and muscle problems using local injections and advanced rehabilitation.",
+        price: 5000,
+        currency: "DZD",
+        duration: "45 min",
+        maxPeople: 1,
+        wilaya: "31",
+        location: "وهران",
+        images: JSON.stringify([]),
+        rating: 4.8,
+        totalReviews: 5,
+        totalBookings: 12,
+        active: true,
+        featured: true,
+      },
+    }),
+
+    // Service 11: Thermal Water Sessions (Provider 4, Thermal Therapy)
+    prisma.service.create({
+      data: {
+        providerId: provider4.id,
+        categoryId: catThermalTherapy.id,
+        titleAr: "جلسات وحمامات المياه المعدنية الحارة",
+        titleEn: "Thermal Water Baths",
+        descriptionAr: "جلسات علاجية واستشفائية في مسابح وحمامات المياه المعدنية الطبيعية التي تصل حرارتها لـ 68 درجة، فعالة جداً لأمراض المفاصل، الروماتيزم، والأمراض الجلدية.",
+        descriptionEn: "Therapeutic sessions in natural thermal mineral water pools reaching 68 degrees, highly effective for joint diseases, rheumatism, and skin conditions.",
+        price: 2500,
+        currency: "DZD",
+        duration: "1 day",
+        maxPeople: 4,
+        wilaya: "44",
+        location: "عين الدفلى",
+        images: JSON.stringify([]),
+        rating: 4.9,
+        totalReviews: 30,
+        totalBookings: 150,
+        active: true,
+        featured: true,
+      },
+    }),
+
+    // Service 12: Aquatic Rehabilitation (Provider 4, Thermal Therapy)
+    prisma.service.create({
+      data: {
+        providerId: provider4.id,
+        categoryId: catThermalTherapy.id,
+        titleAr: "التأهيل الحركي المائي الطبي",
+        titleEn: "Medical Aquatic Rehabilitation",
+        descriptionAr: "إعادة تأهيل حركي في مسابح المياه المعدنية تحت إشراف أخصائيي العلاج الطبيعي، مثالي لما بعد العمليات الجراحية العظمية وإصابات الشلل النصفي.",
+        descriptionEn: "Motor rehabilitation in thermal pools under the supervision of physiotherapists, optimal for post-orthopedic surgeries and hemiplegia injuries.",
+        price: 3500,
+        currency: "DZD",
+        duration: "1 hour",
+        maxPeople: 1,
+        wilaya: "44",
+        location: "عين الدفلى",
+        images: JSON.stringify([]),
+        rating: 5,
+        totalReviews: 12,
+        totalBookings: 25,
+        active: true,
+        featured: true,
+      },
+    }),
   ]);
 
   const [
@@ -434,9 +589,13 @@ async function main() {
     serviceCupping,
     serviceCardiac,
     serviceNutrition,
+    serviceOrthopedicConsult,
+    serviceSportsInjury,
+    serviceThermalBath,
+    serviceAquaticRehab,
   ] = services;
 
-  console.log(`  ✓ Created 8 services\n`);
+  console.log(`  ✓ Created 12 services\n`);
 
   // ─────────────────────────────────────────────
   // 5. BOOKINGS (4 total)
@@ -602,10 +761,10 @@ async function main() {
   console.log("═".repeat(50));
   console.log("✅ Seed completed successfully!\n");
   console.log("📊 Summary:");
-  console.log("   Users:      5");
-  console.log("   Providers:  2");
-  console.log("   Categories: 9");
-  console.log("   Services:   8");
+  console.log("   Users:      7");
+  console.log("   Providers:  4");
+  console.log("   Categories: 10");
+  console.log("   Services:   12");
   console.log("   Bookings:   4");
   console.log("   Reviews:    4");
   console.log("   Messages:   3");
