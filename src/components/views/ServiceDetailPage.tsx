@@ -376,8 +376,11 @@ export default function ServiceDetailPage() {
               {serviceName()}
             </h1>
             <div className="flex flex-wrap items-center gap-4 text-sm text-gray-300">
-              <span className="flex items-center gap-1.5">
-                <MapPin className="w-4 h-4 text-purple-400" />{service.wilaya ? getWilayaName(service.wilaya, locale) : service.location}
+              <span className="flex items-center gap-1.5 flex-wrap">
+                <MapPin className="w-4 h-4 text-purple-400" />
+                {service.wilaya ? getWilayaName(service.wilaya, locale) : ''}
+                {service.wilaya && service.location && <span className="text-purple-400/50 mx-1">•</span>}
+                {service.location}
               </span>
               <span className="flex items-center gap-1.5">
                 <Clock className="w-4 h-4 text-purple-400" />{service.duration}
@@ -435,7 +438,13 @@ export default function ServiceDetailPage() {
                 {
                   icon: <MapPin className="w-5 h-5" />,
                   label: t('location'),
-                  value: service.wilaya ? getWilayaName(service.wilaya, locale) : service.location,
+                  value: (
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      {service.wilaya && <span>{getWilayaName(service.wilaya, locale)}</span>}
+                      {service.wilaya && service.location && <span className="text-purple-400/50">•</span>}
+                      {service.location && <span>{service.location}</span>}
+                    </div>
+                  ),
                 },
                 {
                   icon: <Users className="w-5 h-5" />,

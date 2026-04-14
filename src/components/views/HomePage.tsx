@@ -779,17 +779,16 @@ export default function HomePage() {
                           </span>
                         </div>
 
-                        {/* Duration + Wilaya */}
                         <div className="flex items-center gap-4 text-xs text-muted-foreground mb-4">
                           <span className="flex items-center gap-1.5">
                             <Clock className="w-3.5 h-3.5 text-purple-400" />
                             {service.duration}
                           </span>
-                          <span className="flex items-center gap-1.5">
+                          <span className="flex items-center gap-1.5 flex-wrap">
                             <MapPin className="w-3.5 h-3.5 text-purple-400" />
-                            {service.wilaya
-                              ? getWilayaName(service.wilaya, locale)
-                              : service.location}
+                            {service.wilaya ? getWilayaName(service.wilaya, locale) : ''}
+                            {service.wilaya && service.location && <span className="text-purple-400/50 mx-0.5">•</span>}
+                            {service.location}
                           </span>
                         </div>
 
